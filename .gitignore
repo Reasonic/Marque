@@ -1,0 +1,11 @@
+node_modules/
+*.log
+.DS_Store
+.env
+.env.*
+coverage/
+dist/
+*.tgz
+
+# Fixture PDFs are fetched, not committed — see bench/fetch-fixtures.sh
+bench/fixtures/*.pdf

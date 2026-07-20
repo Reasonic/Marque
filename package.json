@@ -1,0 +1,32 @@
+{
+  "name": "vectorless-rag",
+  "version": "0.0.0",
+  "description": "Vectorless RAG — structure-first document indexing without a vector DB",
+  "main": "src/index.mjs",
+  "scripts": {
+    "test": "node --test 'test/*.test.mjs'",
+    "bench": "node bench/query-cost.mjs bench/fixtures/*.pdf",
+    "eval": "node bench/retrieval-eval.mjs",
+    "fixtures": "./bench/fetch-fixtures.sh"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "gpt-tokenizer": "^3.4.0",
+    "pdfjs-dist": "^6.1.200"
+  },
+  "bin": {
+    "vectorless": "bin/cli.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "src",
+    "bin",
+    "README.md",
+    "LICENSE"
+  ]
+}
