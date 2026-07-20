@@ -7,6 +7,9 @@
 #   ./bench/fetch-fixtures.sh
 set -euo pipefail
 
+# Git does not track empty directories and every fixture is gitignored, so a
+# fresh clone has no fixtures/ directory at all.
+mkdir -p "$(dirname "$0")/fixtures"
 cd "$(dirname "$0")/fixtures"
 
 fetch() {
