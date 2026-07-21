@@ -105,6 +105,12 @@ for (const [docName, qs] of byDoc) {
   } catch (e) {
     save();
     if (e.code === 'BUDGET_EXCEEDED') { stopped = e.message; break outer; }
+    // Non-recoverable provider states (out of credit, bad key) — abort rather
+    // than spin through every remaining document failing the same way.
+    if (/credit balance|billing|authentication_error|invalid.*api.?key|permission/i.test(e.message)) {
+      stopped = `provider unavailable: ${e.message}`;
+      break outer;
+    }
     console.log(`  ! ${docName}: ${e.message}`);
   }
 }
