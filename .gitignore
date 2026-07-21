@@ -12,3 +12,8 @@ bench/fixtures/*.pdf
 
 # Type declarations are emitted at pack time (prepack), not committed.
 types/
+
+# FinanceBench data is fetched, not committed (Patronus AI's data + SEC filings).
+bench/financebench/data/
+bench/financebench/pdfs/
+bench/financebench/results.json

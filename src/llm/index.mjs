@@ -72,6 +72,8 @@ function resolveModel(opts) {
  * @param {string} [opts.apiKey] overrides the provider's env key
  * @param {number} [opts.maxRetries=2] retries on transient provider errors
  * @param {number} [opts.maxOutputTokens=4096]
+ * @param {(u: {model: string, usage: object, kind: string}) => void} [opts.onUsage]
+ *   optional per-call token-usage hook, for cost accounting
  * @returns {{
  *   json: (prompt: string, schema?: object) => Promise<any>,
  *   select: (prompt: string, k?: number) => Promise<string[]>,
@@ -83,6 +85,7 @@ export function createLLM(opts = {}) {
   const model = resolveModel(opts);
   const maxRetries = opts.maxRetries ?? 2;
   const maxOutputTokens = opts.maxOutputTokens ?? 4096;
+  const report = (usage, kind) => opts.onUsage?.({ model: model.modelId, usage, kind });
 
   return {
     /**
@@ -91,9 +94,10 @@ export function createLLM(opts = {}) {
      * `json(prompt)` interface serves both. Callers may pass a narrower schema.
      */
     async json(prompt, schema = Tier3Schema) {
-      const { object } = await generateObject({
+      const { object, usage } = await generateObject({
         model, schema, maxRetries, maxOutputTokens, prompt: sanitize(prompt),
       });
+      report(usage, 'json');
       return object;
     },
 
@@ -104,17 +108,19 @@ export function createLLM(opts = {}) {
      * append to it, so the question stays last for prompt-cache reuse.
      */
     async select(prompt, k = 4) {
-      const { object } = await generateObject({
+      const { object, usage } = await generateObject({
         model, schema: SelectionSchema, maxRetries, maxOutputTokens, prompt: sanitize(prompt),
       });
+      report(usage, 'select');
       return (object?.ids ?? []).slice(0, k);
     },
 
     /** Retrieval answering. Free-form, citable prose over the provided sections. */
     async answer(prompt) {
-      const { text } = await generateText({
+      const { text, usage } = await generateText({
         model, maxRetries, maxOutputTokens, prompt: sanitize(prompt),
       });
+      report(usage, 'answer');
       return text;
     },
 
