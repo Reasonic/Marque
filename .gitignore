@@ -9,3 +9,6 @@ dist/
 
 # Fixture PDFs are fetched, not committed — see bench/fetch-fixtures.sh
 bench/fixtures/*.pdf
+
+# Type declarations are emitted at pack time (prepack), not committed.
+types/

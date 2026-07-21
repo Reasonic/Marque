@@ -72,7 +72,12 @@ function resolveModel(opts) {
  * @param {string} [opts.apiKey] overrides the provider's env key
  * @param {number} [opts.maxRetries=2] retries on transient provider errors
  * @param {number} [opts.maxOutputTokens=4096]
- * @returns {{ json: Function, select: Function, answer: Function, model: object }}
+ * @returns {{
+ *   json: (prompt: string, schema?: object) => Promise<any>,
+ *   select: (prompt: string, k?: number) => Promise<string[]>,
+ *   answer: (prompt: string) => Promise<string>,
+ *   model: object,
+ * }}
  */
 export function createLLM(opts = {}) {
   const model = resolveModel(opts);

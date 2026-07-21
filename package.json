@@ -3,11 +3,21 @@
   "version": "0.0.0",
   "description": "Vectorless RAG — structure-first document indexing without a vector DB",
   "main": "src/index.mjs",
+  "types": "./types/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.mts",
+      "import": "./src/index.mjs"
+    }
+  },
   "scripts": {
     "test": "node --test 'test/*.test.mjs'",
     "bench": "node bench/query-cost.mjs bench/fixtures/*.pdf",
     "eval": "node bench/retrieval-eval.mjs",
-    "fixtures": "./bench/fetch-fixtures.sh"
+    "fixtures": "./bench/fetch-fixtures.sh",
+    "build:types": "tsc -p tsconfig.json",
+    "clean:types": "rm -rf types",
+    "prepack": "npm run build:types"
   },
   "keywords": [],
   "author": "",
@@ -30,7 +40,11 @@
   "files": [
     "src",
     "bin",
+    "types",
     "README.md",
     "LICENSE"
-  ]
+  ],
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
 }

@@ -1,0 +1,17 @@
+{
+  "// note": "Type-generation only. There is no build step for the runtime (ESM .mjs, run directly). This config exists solely to emit .d.ts from JSDoc at pack time — see the build:types / prepack scripts.",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2022",
+    "rootDir": "src",
+    "outDir": "types",
+    "skipLibCheck": true,
+    "strict": false
+  },
+  "include": ["src/**/*.mjs"]
+}
