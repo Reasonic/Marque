@@ -33,7 +33,8 @@
     "zod": "^4.4.3"
   },
   "bin": {
-    "vectorless": "bin/cli.mjs"
+    "vectorless": "bin/cli.mjs",
+    "vectorless-rag": "bin/cli.mjs"
   },
   "engines": {
     "node": ">=22"
