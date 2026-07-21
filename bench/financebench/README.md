@@ -109,18 +109,33 @@ By question type:
 
 Agreement grid: both correct 23 · **ours only 14** · baseline only 39 · neither 66.
 
-**Structure-first loses here, and the design predicted it.** These are 100–200 page
-10-Ks whose answers are numbers inside financial statements. Our retrieval navigates
-the heading tree; the FY2018 capital-expenditure figure lives in the Consolidated
-Statement of Cash Flows under a generic *"Item 8. Financial Statements"* heading that
-the word "capex" does not match, while vector + BM25 matches the number's surrounding
-text directly. The failure mode is unambiguous: **74% of the questions ours lost, it
-lost by never surfacing the relevant section** (*"the sections provided do not contain
-this information"*), not by extracting a wrong number.
+**Structure-first loses here, and the diagnosis is precise.** These are 100–200 page
+10-Ks whose answers are numbers inside financial statements. The deeper cause is a
+*vocabulary* gap, not a granularity one: the FY2018 capital-expenditure figure appears
+only as *"Purchases of property, plant and equipment (PP&E) $(1,577)"* — the words
+"capital expenditure" never sit next to it. Lexical retrieval cannot cross a synonym;
+vector search, matching meaning, can. That single gap accounts for most of the loss.
 
-It is not a rout. Ours uniquely answers **14** questions the baseline gets wrong —
-where the answer is prose under a semantically named heading, structure-first wins —
-but on balance, for table-bound financial QA, a tuned vector stack is clearly ahead.
+### Query expansion closes half the gap
+
+One small LLM call that expands the query with the document's likely wording
+("capex" → "purchases of property, plant and equipment") *before* lexical retrieval
+lifts ours from **26% to 36%** (54/150, full run). An A/B on the same questions shows
+the gain is almost entirely from expansion, not the coverage/localisation fixes that
+ship alongside it:
+
+| ours (same 117 questions) | strict agreement |
+|---|---|
+| no expansion | 27.4% |
+| + coverage & localisation | 28.2% |
+| **+ query expansion** | **35.9%** |
+
+That roughly **halves** the distance to the vector baseline (44%), for near-zero cost
+and still no vector database. What remains is the genuinely semantic tail, where
+embeddings keep the edge. It is not a rout — ours also uniquely answers **14**
+questions the baseline gets wrong — and the honest boundary is now the narrower one:
+you do not need a vector database to *navigate* a structured document, and expansion
+recovers much of the harder retrieval too.
 
 This is the boundary the benchmark exists to draw. The library's claim is that you do
 not need a vector database to *navigate* a structured document, and the

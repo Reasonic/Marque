@@ -16,4 +16,4 @@ types/
 # FinanceBench data is fetched, not committed (Patronus AI's data + SEC filings).
 bench/financebench/data/
 bench/financebench/pdfs/
-bench/financebench/results.json
+bench/financebench/results*.json

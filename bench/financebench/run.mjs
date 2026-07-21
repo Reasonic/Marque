@@ -42,6 +42,8 @@ const GRADER_MODEL = arg('grader-model', M.grader);
 const OUT = arg('out', new URL('./results.json', import.meta.url).pathname);
 const RESUME = process.argv.includes('--resume');
 const CONCURRENCY = Number(arg('concurrency', 0)) || 0; // 0 → baseline default
+const SKIP_BASELINE = process.argv.includes('--skip-baseline'); // measure ours only (reuse a prior baseline)
+const NO_EXPAND = process.argv.includes('--no-expand'); // disable ours' query expansion (for an A/B)
 
 // Route our side to the *same* answerer the baseline uses, so the only variable
 // is retrieval (not the generator). Provider follows the model id.
@@ -52,11 +54,14 @@ const llm = createLLM({
   model: ANSWER_MODEL,
   onUsage: ({ model, usage }) => record(model, usage),
 });
+if (NO_EXPAND && llm.expand) delete llm.expand;
 
 const all = await loadQuestions();
 const { questions, docs } = pickSubset(all, N);
-console.log(`FinanceBench: ${questions.length} questions across ${docs.length} docs `
-  + `(budget $${BUDGET})\n  answerer ${ANSWER_MODEL} · baseline-context ${CONTEXT_MODEL} · grader ${GRADER_MODEL}\n`);
+console.log(`FinanceBench: ${questions.length} questions across ${docs.length} docs (budget $${BUDGET})\n`
+  + `  answerer ${ANSWER_MODEL} · grader ${GRADER_MODEL}`
+  + `${SKIP_BASELINE ? ' · baseline SKIPPED' : ` · baseline-context ${CONTEXT_MODEL}`}`
+  + ` · ours-expansion ${NO_EXPAND ? 'off' : 'on'}\n`);
 
 // Group questions by document so each document is indexed once per system.
 const byDoc = new Map();
@@ -88,7 +93,10 @@ if (RESUME && fs.existsSync(OUT)) {
     + `($${priorCost} spent previously, not re-charged this run)\n`);
 }
 
-const rate = (rs, sys) => (rs.length ? rs.filter((r) => r[sys].correct).length / rs.length : 0);
+const rate = (rs, sys) => {
+  const v = rs.filter((r) => r[sys] && typeof r[sys].correct === 'boolean');
+  return v.length ? v.filter((r) => r[sys].correct).length / v.length : null;
+};
 const buildReport = () => {
   const types = [...new Set(results.map((r) => r.type))];
   return {
@@ -119,34 +127,36 @@ for (const [docName, qsAll] of byDoc) {
     const pdf = await ensurePdf(docName);
     const doc = await extract(pdf);
 
-    // Index once per system.
+    // Index once per system (baseline skipped when only measuring ours).
     const ours = await index(pdf, { llm });
-    const bl = await blBuild(doc.fullText, {
+    const bl = SKIP_BASELINE ? null : await blBuild(doc.fullText, {
       contextModel: CONTEXT_MODEL, answerModel: ANSWER_MODEL,
       ...(CONCURRENCY ? { concurrency: CONCURRENCY } : {}),
     });
-    process.stdout.write(`indexed [ours tier=${ours.tier}, baseline ${bl.items.length} chunks, $${spent().toFixed(2)}]\n`);
+    process.stdout.write(`indexed [ours tier=${ours.tier}`
+      + (bl ? `, baseline ${bl.items.length} chunks` : ', baseline skipped') + `, $${spent().toFixed(2)}]\n`);
 
     for (const q of qs) {
       guard();
       const oursRes = await query(ours, q.question, { llm });
       const oursAns = oursRes.answer ?? '';
+      const oursV = await grade(q.question, q.answer, oursAns, { graderModel: GRADER_MODEL });
 
-      const blChunks = await blRetrieve(bl, q.question);
-      const blAns = await blAnswer(blChunks, q.question, { answerModel: ANSWER_MODEL });
-
-      const [oursV, blV] = await Promise.all([
-        grade(q.question, q.answer, oursAns, { graderModel: GRADER_MODEL }),
-        grade(q.question, q.answer, blAns, { graderModel: GRADER_MODEL }),
-      ]);
+      let baseline = null;
+      if (bl) {
+        const blChunks = await blRetrieve(bl, q.question);
+        const blAns = await blAnswer(blChunks, q.question, { answerModel: ANSWER_MODEL });
+        const blV = await grade(q.question, q.answer, blAns, { graderModel: GRADER_MODEL });
+        baseline = { answer: blAns, correct: blV.correct, reason: blV.reason };
+      }
 
       results.push({
         id: q.financebench_id, doc: docName, type: q.question_type,
         question: q.question, gold: q.answer,
         ours: { answer: oursAns, correct: oursV.correct, reason: oursV.reason },
-        baseline: { answer: blAns, correct: blV.correct, reason: blV.reason },
+        baseline,
       });
-      console.log(`  ${oursV.correct ? '✓' : '✗'}ours ${blV.correct ? '✓' : '✗'}base  `
+      console.log(`  ${oursV.correct ? '✓' : '✗'}ours ${baseline ? (baseline.correct ? '✓base' : '✗base') : ''}  `
         + `$${spent().toFixed(2)}  ${q.question.slice(0, 60)}`);
     }
     save(); // checkpoint after each document
@@ -164,7 +174,7 @@ for (const [docName, qsAll] of byDoc) {
 }
 
 // --- Aggregate -------------------------------------------------------------
-const pct = (x) => `${(100 * x).toFixed(1)}%`;
+const pct = (x) => (x == null ? 'n/a' : `${(100 * x).toFixed(1)}%`);
 const report = buildReport();
 save();
 

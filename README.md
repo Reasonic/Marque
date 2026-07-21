@@ -218,23 +218,28 @@ much smaller sections are than the pages containing them.
 
 ## Where this loses
 
-Structure-first retrieval navigates to *sections* — it does not localize a
-*number inside a table*. On [FinanceBench](bench/financebench/README.md) — 150
-questions over 100–200 page 10-K filings, where the answer is usually a figure in
-a financial statement — a tuned vector baseline (contextual embeddings + BM25)
-beats it:
+Structure-first retrieval is lexical, so it stumbles when the question and the
+document say the same thing in different words. On
+[FinanceBench](bench/financebench/README.md) — 150 questions over 100–200 page
+10-K filings — the question asks for "capital expenditures" while the statement
+labels it *"Purchases of property, plant and equipment"*. A tuned vector
+baseline, which matches meaning rather than words, leads:
 
-| system | FinanceBench strict agreement (142/150) |
+| system | FinanceBench strict agreement |
 |---|---|
-| this library (structure-first) | **26%** |
-| tuned vector baseline | **44%** |
+| this library + query expansion | **36%** (54 / 150) |
+| tuned vector baseline (contextual embeddings + BM25) | **44%** (62 / 142) |
 
-74% of the losses share one cause: the answer's section is never retrieved,
-because a query like "capex" doesn't match the heading *"Item 8. Financial
-Statements"* the way vector search matches the number's surrounding text. (It
-still uniquely answers 14 questions the baseline misses.) For table-bound
-financial QA, reach for embeddings — the claim here is narrower, and it holds:
-you don't need a vector database to *navigate* a structured document.
+Both systems answer and are graded by the same model (`gpt-4o`); the baseline is
+a prior measured run, unaffected by these retrieval changes.
+
+**Query expansion** — one small LLM call that adds the synonyms and formal labels
+a document may use (`capex` → "purchases of property, plant and equipment") before
+lexical retrieval — lifts this library from **26% to 36%** and roughly **halves**
+the gap to the vector baseline, for near-zero cost and still no vector database.
+What remains is the genuinely semantic tail, where embeddings still win. The claim
+this library makes is the narrower, honest one: you do not need a vector database
+to *navigate* a structured document, and expansion recovers much of the rest.
 
 ## Known gaps
 
