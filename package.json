@@ -15,6 +15,7 @@
     "bench": "node bench/query-cost.mjs bench/fixtures/*.pdf",
     "eval": "node bench/retrieval-eval.mjs",
     "fixtures": "./bench/fetch-fixtures.sh",
+    "lint": "eslint .",
     "build:types": "tsc -p tsconfig.json",
     "clean:types": "rm -rf types",
     "prepack": "npm run build:types"
@@ -45,6 +46,9 @@
     "LICENSE"
   ],
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.7.0",
+    "globals": "^17.7.0",
     "typescript": "^7.0.2"
   }
 }

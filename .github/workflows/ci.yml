@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Least privilege: CI only needs to read the checked-out code.
+permissions:
+  contents: read
+
+# Supersede in-flight runs on the same ref (e.g. a force-push to a PR).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  test:
+    name: test (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      # Fixtures are fetched, not committed. Cache them across runs; fork PRs
+      # read the base repo's cache, so they stay green without re-fetching.
+      - name: Cache benchmark fixtures
+        uses: actions/cache@v4
+        with:
+          path: bench/fixtures
+          key: fixtures-${{ hashFiles('bench/fetch-fixtures.sh') }}
+      - run: npm run fixtures
+      - run: npm test
+      - run: npm run eval
+
+  # Provider-dependent (live) tests are gated on a repository secret so forks —
+  # which never receive secrets — skip them and stay green. The live suite lands
+  # in task 1.2; until then `test:live` is absent and --if-present is a no-op.
+  provider:
+    name: provider (live, secret-gated)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Live provider tests
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "No ANTHROPIC_API_KEY (fork PR or unset secret) — skipping live provider tests."
+            exit 0
+          fi
+          npm run fixtures
+          npm run test:live --if-present

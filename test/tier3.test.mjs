@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { extract } from '../src/extract/pdf.mjs';
-import { verifyAll, UNVERIFIED, VERIFIED } from '../src/structure/verify.mjs';
+import { verifyAll, UNVERIFIED } from '../src/structure/verify.mjs';
 import { adjudicate, inferStructure } from '../src/structure/tier3.mjs';
 import { index } from '../src/index.mjs';
 
