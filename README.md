@@ -50,9 +50,9 @@ Five documents, no API key, no LLM calls:
 |---|---|---|---|---|---|---|
 | Bank of England AR | 220 | outline | 38 | 29/38 | 38/38 | 427 ms |
 | Berkshire AR | 152 | outline | 21 | 15/21 | 18/21 | 699 ms |
-| GPT-4 tech report | 100 | outline | 26 | 26/26 | 26/26 | 448 ms |
-| Attention paper | 15 | outline | 22 | 22/22 | 22/22 | 259 ms |
-| BERT paper | 16 | **headings** | 14 | 14/14 | 14/14 | 194 ms |
+| GPT-4 tech report | 100 | outline | 28 | 28/28 | 28/28 | 448 ms |
+| Attention paper | 15 | outline | 23 | 23/23 | 23/23 | 259 ms |
+| BERT paper | 16 | **headings** | 12 | 12/12 | 12/12 | 194 ms |
 
 BERT has no embedded outline, so tier 2 handles it — and recovers the true
 structure exactly: Abstract, sections 1–6, References, and appendices A/B/C, all
@@ -73,14 +73,14 @@ So verification reports three states, and none of them is "wrong":
 - **partial** — 50–80%
 - **unverified** — below 50%; needs tier-3 adjudication
 
-Across the four outline-tier documents, 104 of 107 sections verify locally.
+Across the four outline-tier documents, 107 of 110 sections verify locally.
 PageIndex spends one LLM call per section on this, and treats a mismatch as an
 error to be "repaired" — which can corrupt a correct index.
 
 ## Tier 3
 
 Runs only when tiers 1–2 leave something unresolved. On the five fixtures it is
-invoked for **3 entries out of 121** — PageIndex, by contrast, runs an LLM pass
+invoked for **2 entries out of 122** — PageIndex, by contrast, runs an LLM pass
 over every section unconditionally.
 
 Two jobs: **`adjudicate()`** resolves entries local verification could not
@@ -89,7 +89,7 @@ confirm; **`inferStructure()`** recovers headings when a document declares none.
 Three rules separate it from PageIndex's equivalent:
 
 1. **Batched.** PageIndex spends one call per section on verification and another
-   per repair. Here many entries share one call, bounded by tokens — all three
+   per repair. Here many entries share one call, bounded by tokens — both
    unresolved fixture entries fit in a single call.
 2. **Independent windows.** PageIndex's no-outline path feeds each window the
    tree built so far, making it strictly sequential. These windows are
@@ -102,13 +102,26 @@ Three rules separate it from PageIndex's equivalent:
    cannot corroborate does not overturn it.
 
 ```js
-const result = await index('report.pdf', {
-  llm: { json: async (prompt) => /* parsed JSON */ },
-});
+import { index, createLLM } from 'vectorless-rag';
+
+// Use the bundled OpenAI / Anthropic adapter (reads ANTHROPIC_API_KEY or
+// OPENAI_API_KEY), or pass your own { json: async (prompt) => /* parsed JSON */ }.
+const result = await index('report.pdf', { llm: createLLM() });
 ```
 
 Without `llm`, tier 3 is skipped and unresolved entries stay marked
 `unverified` — a truthful state, not a failure.
+
+**Measured** — Claude Opus 4.8, reproducible with `node --env-file=.env bench/live-measure.mjs`:
+
+| Path | Document | Result | Calls | Input tokens | Latency |
+|---|---|---|---|---|---|
+| `adjudicate()` | Berkshire AR | 2 unverified → 0, both resolved | 1 (batched) | 2,265 | 3.7 s |
+| `inferStructure()` | no-outline fixture | `tier=llm`, 8 sections, 8/8 verified | 1 | 688 | 23 s |
+
+Both unresolved Berkshire entries were confirmed in one batched call; a fixture
+with no outline and uniform typography — nothing for tiers 1–2 to read — was
+recovered entirely by tier 3, and every recovered heading verified locally.
 
 ## Retrieval
 
@@ -153,6 +166,17 @@ failure: "Cybersecurity" ranked 6th behind the Chairman's Letter.
 So the LLM's job is re-ranking 12 titles, not searching a document. That payload
 is a few hundred tokens.
 
+**Measured** — with the LLM selector on (Claude Opus 4.8, same 17 queries):
+
+| Metric | BM25 only | + LLM selection |
+|---|---|---|
+| Correct section selected (top 4) | 14/17 (82%) | **16/17 (94%)** |
+
+The LLM re-ranker recovers two of BM25's three misses — including "Cybersecurity",
+which BM25 ranked 6th behind the Chairman's Letter. All 17 answers cited a section
+id. Median input per query: ~550 selection + ~1,300 answering tokens — the
+selection payload is indeed a few hundred tokens, as designed.
+
 ### Using an LLM
 
 Pass any two functions; no provider is bundled.
@@ -176,11 +200,11 @@ document outline can sit in a cached prefix across queries.
 
 | Document | PageIndex | This design | Reduction |
 |---|---|---|---|
-| Attention | 19,072 | 2,252 | **8.5×** |
-| BERT | 22,016 | 4,067 | **5.4×** |
+| Attention | 17,632 | 2,114 | **8.3×** |
+| BERT | 23,098 | 5,194 | **4.4×** |
 | Bank of England AR | 30,144 | 5,426 | **5.6×** |
 | Berkshire AR | 50,906 | 9,680 | **5.3×** |
-| GPT-4 report | 26,264 | 2,583 | **10.2×** |
+| GPT-4 report | 24,122 | 2,960 | **8.1×** |
 
 Most of the saving comes from replacing an agent loop — which re-sends the whole
 tree and every fetched page on each turn — with two bounded calls. Character-exact
@@ -189,22 +213,12 @@ much smaller sections are than the pages containing them.
 
 ## Known gaps
 
-- **No LLM path has been run against a live provider.** Tier 3 is covered by 10
-  tests using deterministic mocks, which exercise batching, merging, window
-  filtering and the never-guess guards — but no real model has been called.
-  Retrieval's `select`/`answer` hooks are not covered even by mocks.
-- `inferStructure()` has never been run on a document that actually needs it;
-  all five fixtures resolve at tier 1 or 2.
-- The final section absorbs all trailing content, because nothing follows it in
-  the outline. In the Attention paper "Conclusion" spans p10–15, pulling in the
-  references.
-- Multi-line headings are split into separate sections (BERT's three-line
-  appendix title becomes three entries).
 - Scanned PDFs with no text layer are not handled; they need OCR.
-- The query-cost benchmark models payload size and calls no LLM. It has not been
-  validated against an instrumented end-to-end PageIndex run.
-- Fixture PDFs are committed for reproducibility; they should be fetched by
-  script instead.
+- Multi-document routing is not implemented — this indexes one document at a time.
+- The query-cost benchmark (the PageIndex column above) models payload size and
+  calls no LLM; it has not been validated against an instrumented end-to-end
+  PageIndex run. The vectorless side is now measured live — see the Tier 3 and
+  Retrieval sections above.
 
 ## License
 

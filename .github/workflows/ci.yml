@@ -52,8 +52,9 @@ jobs:
       - run: npm run eval
 
   # Provider-dependent (live) tests are gated on a repository secret so forks —
-  # which never receive secrets — skip them and stay green. The live suite lands
-  # in task 1.2; until then `test:live` is absent and --if-present is a no-op.
+  # which never receive secrets — skip them and stay green. The suite uses only
+  # the committed tier3.pdf, so no fixture fetch (and no flaky annual-report URL)
+  # is needed here.
   provider:
     name: provider (live, secret-gated)
     runs-on: ubuntu-latest
@@ -72,5 +73,4 @@ jobs:
             echo "No ANTHROPIC_API_KEY (fork PR or unset secret) — skipping live provider tests."
             exit 0
           fi
-          npm run fixtures
-          npm run test:live --if-present
+          npm run test:live

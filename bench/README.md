@@ -41,11 +41,11 @@ itself, so the benchmark and the library cannot drift apart.
 
 | Document | Pages | Nodes | PageIndex | Progressive | Reduction |
 |---|---|---|---|---|---|
-| Attention | 15 | 22 | 19,072 | 2,252 | **8.5×** |
-| BERT | 16 | 14 | 22,016 | 4,067 | **5.4×** |
+| Attention | 15 | 23 | 17,632 | 2,114 | **8.3×** |
+| BERT | 16 | 12 | 23,098 | 5,194 | **4.4×** |
 | Bank of England AR | 220 | 38 | 30,144 | 5,426 | **5.6×** |
 | Berkshire AR | 152 | 61 | 50,906 | 9,680 | **5.3×** |
-| GPT-4 report | 100 | 33 | 26,264 | 2,583 | **10.2×** |
+| GPT-4 report | 100 | 32 | 24,122 | 2,960 | **8.1×** |
 
 Two independent effects, worth separating:
 
@@ -66,9 +66,9 @@ honest headline.
 
 | Document | Headings located to an exact character offset |
 |---|---|
-| GPT-4 report | 26/26 |
-| Attention | 22/22 |
-| BERT | 14/14 |
+| GPT-4 report | 28/28 |
+| Attention | 23/23 |
+| BERT | 12/12 |
 | Bank of England AR | 29/38 |
 | Berkshire AR | 15/21 |
 
