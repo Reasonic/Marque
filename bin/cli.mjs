@@ -9,7 +9,7 @@ const question = qFlag !== -1 ? args[qFlag + 1] : null;
 const files = args.filter((a, i) => !a.startsWith('--') && !(qFlag !== -1 && i === qFlag + 1));
 
 if (!files.length) {
-  console.error('usage: vectorless <file.pdf ...> [--json] [--query "question"] [--llm]');
+  console.error('usage: marque <file.pdf ...> [--json] [--query "question"] [--llm]');
   console.error('  --llm  enable tier 3 and LLM retrieval via ANTHROPIC_API_KEY / OPENAI_API_KEY');
   process.exit(1);
 }

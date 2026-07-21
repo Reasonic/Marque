@@ -38,7 +38,7 @@ function inferProvider(opts) {
   if (process.env.ANTHROPIC_API_KEY) return 'anthropic';
   if (process.env.OPENAI_API_KEY) return 'openai';
   throw new Error(
-    'vectorless-rag: no LLM provider configured. Set ANTHROPIC_API_KEY or '
+    'marque: no LLM provider configured. Set ANTHROPIC_API_KEY or '
     + 'OPENAI_API_KEY, or pass { provider, apiKey } to createLLM().',
   );
 }
@@ -60,7 +60,7 @@ function resolveModel(opts) {
   if (provider === 'anthropic') return createAnthropic(settings)(modelId);
   if (provider === 'openai') return createOpenAI(settings)(modelId);
   throw new Error(
-    `vectorless-rag: unsupported provider "${provider}". Use "anthropic" or `
+    `marque: unsupported provider "${provider}". Use "anthropic" or `
     + '"openai", or pass a pre-built AI SDK model as { model }.',
   );
 }

@@ -1,6 +1,6 @@
-# vectorless-rag
+# Marque
 
-Structure-first document indexing. No vector database, no embeddings, no chunking.
+Structure-first document indexing for RAG. No vector database, no embeddings, no chunking.
 
 Documents already contain their own structure. Most PDFs ship an embedded
 outline; most of the rest announce their headings typographically. Reading that
@@ -58,8 +58,11 @@ BERT has no embedded outline, so tier 2 handles it — and recovers the true
 structure exactly: Abstract, sections 1–6, References, and appendices A/B/C, all
 on the correct pages, with no LLM involved.
 
-For comparison, PageIndex spends roughly 200–250 LLM calls and $0.97–$6.12 to
-reconstruct this same information for a document of this size.
+For comparison, PageIndex never reads the embedded outline (verifiable in its MIT
+source) and reconstructs this same information from scratch — an estimated
+~200–250 LLM calls for a document of this size, dollars of API cost against zero
+here. (The call count is our estimate from reading the source, not a measured
+figure.)
 
 ## Verification
 
@@ -73,9 +76,11 @@ So verification reports three states, and none of them is "wrong":
 - **partial** — 50–80%
 - **unverified** — below 50%; needs tier-3 adjudication
 
-Across the four outline-tier documents, 107 of 110 sections verify locally.
-PageIndex spends one LLM call per section on this, and treats a mismatch as an
-error to be "repaired" — which can corrupt a correct index.
+Across the four outline-tier documents, 107 of 110 sections verify locally, with
+no LLM. PageIndex verifies each section with an LLM call and, on a mismatch,
+relocates the section — the behavior the *never guess* rule below exists to
+avoid: a correctly-placed section whose title is merely worded differently should
+not be moved.
 
 ## Tier 3
 
@@ -102,7 +107,7 @@ Three rules separate it from PageIndex's equivalent:
    cannot corroborate does not overturn it.
 
 ```js
-import { index, createLLM } from 'vectorless-rag';
+import { index, createLLM } from 'marque-rag';
 
 // Use the bundled OpenAI / Anthropic adapter (reads ANTHROPIC_API_KEY or
 // OPENAI_API_KEY), or pass your own { json: async (prompt) => /* parsed JSON */ }.
@@ -211,13 +216,33 @@ tree and every fetched page on each turn — with two bounded calls. Character-e
 section addressing contributes a further 1.0×–2.6× (median), depending on how
 much smaller sections are than the pages containing them.
 
+## Where this loses
+
+Structure-first retrieval navigates to *sections* — it does not localize a
+*number inside a table*. On [FinanceBench](bench/financebench/README.md) — 150
+questions over 100–200 page 10-K filings, where the answer is usually a figure in
+a financial statement — a tuned vector baseline (contextual embeddings + BM25)
+beats it:
+
+| system | FinanceBench strict agreement (142/150) |
+|---|---|
+| this library (structure-first) | **26%** |
+| tuned vector baseline | **44%** |
+
+74% of the losses share one cause: the answer's section is never retrieved,
+because a query like "capex" doesn't match the heading *"Item 8. Financial
+Statements"* the way vector search matches the number's surrounding text. (It
+still uniquely answers 14 questions the baseline misses.) For table-bound
+financial QA, reach for embeddings — the claim here is narrower, and it holds:
+you don't need a vector database to *navigate* a structured document.
+
 ## Known gaps
 
 - Scanned PDFs with no text layer are not handled; they need OCR.
 - Multi-document routing is not implemented — this indexes one document at a time.
 - The query-cost benchmark (the PageIndex column above) models payload size and
   calls no LLM; it has not been validated against an instrumented end-to-end
-  PageIndex run. The vectorless side is now measured live — see the Tier 3 and
+  PageIndex run. Marque's own side is now measured live — see the Tier 3 and
   Retrieval sections above.
 
 ## License

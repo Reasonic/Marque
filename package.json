@@ -1,7 +1,7 @@
 {
-  "name": "vectorless-rag",
-  "version": "0.0.0",
-  "description": "Vectorless RAG — structure-first document indexing without a vector DB",
+  "name": "marque-rag",
+  "version": "0.1.0",
+  "description": "Marque — structure-first document indexing for RAG, without a vector database",
   "main": "src/index.mjs",
   "types": "./types/index.d.mts",
   "exports": {
@@ -35,8 +35,8 @@
     "zod": "^4.4.3"
   },
   "bin": {
-    "vectorless": "bin/cli.mjs",
-    "vectorless-rag": "bin/cli.mjs"
+    "marque": "bin/cli.mjs",
+    "marque-rag": "bin/cli.mjs"
   },
   "engines": {
     "node": ">=22"

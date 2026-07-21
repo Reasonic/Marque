@@ -1,5 +1,5 @@
 /**
- * vectorless-rag — structure-first document indexing without a vector DB.
+ * Marque — structure-first document indexing without a vector DB.
  *
  * Structure is recovered in tiers, cheapest first. Most real documents never
  * reach the LLM tier at all:

@@ -16,7 +16,7 @@ import { MODELS, FINANCEBENCH_MODELS, FIXTURES } from './config.mjs';
 const run = (cmd) => { console.log(`\n$ ${cmd}`); execSync(cmd, { stdio: 'inherit' }); };
 
 console.log('='.repeat(70));
-console.log('vectorless-rag — reproducible benchmarks');
+console.log('Marque — reproducible benchmarks');
 console.log('phase-1 models:   ', JSON.stringify(MODELS));
 console.log('financebench models:', JSON.stringify(FINANCEBENCH_MODELS));
 console.log('='.repeat(70));
