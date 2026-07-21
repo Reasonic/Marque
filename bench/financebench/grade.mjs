@@ -9,10 +9,15 @@
  */
 import { generateObject } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
+import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { record, guard } from '../meter.mjs';
 
 const anthropic = createAnthropic();
+const openai = createOpenAI();
+
+/** Route a grader model id to its provider (Claude → Anthropic, else → OpenAI). */
+const chat = (id) => (/claude/i.test(id) ? anthropic(id) : openai(id));
 
 const VERDICT = z.object({
   correct: z.boolean(),
@@ -29,10 +34,10 @@ This is strict agreement: when in doubt, mark incorrect.`;
  * @returns {{correct: boolean, reason: string}}
  */
 export async function grade(question, gold, candidate, opts = {}) {
-  const model = opts.graderModel || 'claude-opus-4-8';
+  const model = opts.graderModel || 'gpt-4o';
   guard();
   const { object, usage } = await generateObject({
-    model: anthropic(model),
+    model: chat(model),
     schema: VERDICT,
     maxRetries: 3,
     prompt: `${PROMPT}\n\nQuestion:\n${question}\n\nGold answer:\n${gold}\n\nCandidate answer:\n${candidate}`,

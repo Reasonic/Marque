@@ -25,7 +25,10 @@ const AdjudicationResult = z.object({
   starts_here: z.boolean(),
   // Corrected page, or null when the section does not start on the claimed page
   // and the model cannot place it. Consumer guards with Number.isInteger.
-  page: z.number().int().nullable().optional(),
+  // Nullable but NOT optional: OpenAI strict structured outputs require every
+  // property of an object to appear in `required`, so an absent-value field must
+  // be nullable-and-required, never optional (an optional field 400s on OpenAI).
+  page: z.number().int().nullable(),
   confident: z.boolean(),
 });
 
@@ -44,15 +47,17 @@ export const HeadingsSchema = z.object({ headings: z.array(InferredHeading) });
  *
  * `json` is a single method that serves two prompts — adjudication and
  * structure inference — and its interface takes only a prompt, so one schema
- * has to cover both. Whichever the prompt asks for is filled, the other is left
- * out. Both branches are `.nullable().optional()`: Anthropic's tool mode omits
- * the unused branch (undefined), while OpenAI's strict outputs make every field
- * required and return the unused one as null. The consumers read
- * `reply?.results ?? []` and `reply?.headings ?? []`, so either is a no-op.
+ * has to cover both. Both branches are `.nullable()` — required, never
+ * `.optional()`: OpenAI's strict structured outputs require every property to
+ * appear in `required`, and an optional branch 400s the request. Each tier-3
+ * call fills its branch and leaves the other `null` (grammar-constrained, so the
+ * model always emits both keys). The consumers read `reply?.results ?? []` and
+ * `reply?.headings ?? []` — each reads only its own branch, so the unused null
+ * (or any stray content the model puts there) is ignored.
  */
 export const Tier3Schema = z.object({
-  results: z.array(AdjudicationResult).nullable().optional(),
-  headings: z.array(InferredHeading).nullable().optional(),
+  results: z.array(AdjudicationResult).nullable(),
+  headings: z.array(InferredHeading).nullable(),
 });
 
 /**

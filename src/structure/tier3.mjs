@@ -81,6 +81,7 @@ export async function adjudicate(doc, entries, llm, opts = {}) {
   let calls = 0;
   let tokens = 0;
   let resolved = 0;
+  let skipped = 0;
 
   const results = await Promise.all(batches.map(async (group) => {
     const body = group
@@ -89,8 +90,17 @@ export async function adjudicate(doc, entries, llm, opts = {}) {
     const prompt = `${ADJUDICATE_PROMPT}\n\n${body}`;
     calls++;
     tokens += countTokens(prompt);
-    const reply = await llm.json(prompt);
-    return { group, reply };
+    try {
+      const reply = await llm.json(prompt);
+      return { group, reply };
+    } catch {
+      // One batch failing must not abort the whole document. A provider can halt
+      // a generation mid-JSON (e.g. an OpenAI content-filter false positive on
+      // benign filing text), which throws here — leave this batch's entries
+      // unverified rather than losing every other batch. Invariant: never guess.
+      skipped++;
+      return { group, reply: null };
+    }
   }));
 
   for (const { group, reply } of results) {
@@ -123,7 +133,7 @@ export async function adjudicate(doc, entries, llm, opts = {}) {
     }
   }
 
-  return { entries: out, calls, tokens, resolved };
+  return { entries: out, calls, tokens, resolved, skipped };
 }
 
 const INFER_PROMPT = `Extract the section headings from this portion of a document.
@@ -153,14 +163,23 @@ export async function inferStructure(doc, llm, opts = {}) {
 
   let calls = 0;
   let tokens = 0;
+  let skipped = 0;
 
   const replies = await Promise.all(windows.map(async (win, i) => {
     const overlap = i > 0 ? marked.slice(Math.max(0, marked.indexOf(win[0]) - cfg.chunkOverlap), marked.indexOf(win[0])) : [];
     const prompt = `${INFER_PROMPT}\n\n${[...overlap, ...win].map((p) => p.text).join('\n\n')}`;
     calls++;
     tokens += countTokens(prompt);
-    const reply = await llm.json(prompt);
-    return { pages: new Set(win.map((p) => p.page)), reply };
+    try {
+      const reply = await llm.json(prompt);
+      return { pages: new Set(win.map((p) => p.page)), reply };
+    } catch {
+      // A single window failing (e.g. an OpenAI content-filter false positive
+      // halts the generation, leaving unparseable JSON) must not lose the whole
+      // document's inferred structure — skip this window, keep the rest.
+      skipped++;
+      return { pages: new Set(win.map((p) => p.page)), reply: null };
+    }
   }));
 
   // Merge, keeping only headings whose page belongs to the window that found it
@@ -184,5 +203,5 @@ export async function inferStructure(doc, llm, opts = {}) {
   }
 
   entries.sort((a, b) => a.page - b.page || a.depth - b.depth);
-  return { entries, calls, tokens };
+  return { entries, calls, tokens, skipped };
 }

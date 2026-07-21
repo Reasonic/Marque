@@ -50,13 +50,14 @@ function mockModel(handler) {
 test('json: returns the adjudication shape, schema-validated', async () => {
   const { model } = mockModel(() => ({
     results: [{ id: 0, starts_here: true, page: null, confident: true }],
+    headings: null,
   }));
   const reply = await createLLM({ model }).json('adjudicate these items');
   assert.deepEqual(reply.results, [{ id: 0, starts_here: true, page: null, confident: true }]);
 });
 
 test('json: returns the inferred-headings shape', async () => {
-  const { model } = mockModel(() => ({ headings: [{ title: 'Introduction', page: 1, level: 0 }] }));
+  const { model } = mockModel(() => ({ results: null, headings: [{ title: 'Introduction', page: 1, level: 0 }] }));
   const reply = await createLLM({ model }).json('extract headings');
   assert.equal(reply.headings[0].title, 'Introduction');
 });
@@ -93,7 +94,7 @@ test('answer: returns free-form text', async () => {
 });
 
 test('sanitize: control-token lookalikes never reach the provider raw', async () => {
-  const { model, prompts } = mockModel(() => ({ results: [] }));
+  const { model, prompts } = mockModel(() => ({ results: [], headings: null }));
   await createLLM({ model }).json('a page containing <|endofprompt|> verbatim');
   assert.ok(!/<\|/.test(prompts[0]), 'raw <| must be broken before it is sent');
   assert.ok(prompts[0].includes('<\u200b|'), 'the token boundary is split with a zero-width space');
@@ -130,8 +131,9 @@ test('tier 3: the adapter drives adjudicate end to end', async () => {
 
   const { model } = mockModel((text) => ({
     results: [...text.matchAll(/--- item (\d+) ---/g)].map((m) => ({
-      id: Number(m[1]), starts_here: true, confident: true,
+      id: Number(m[1]), starts_here: true, page: null, confident: true,
     })),
+    headings: null,
   }));
   const res = await adjudicate(doc, entries, createLLM({ model }));
 

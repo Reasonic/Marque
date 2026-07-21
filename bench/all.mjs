@@ -11,13 +11,14 @@
  */
 import { execSync } from 'node:child_process';
 import { index } from '../src/index.mjs';
-import { MODELS, FIXTURES } from './config.mjs';
+import { MODELS, FINANCEBENCH_MODELS, FIXTURES } from './config.mjs';
 
 const run = (cmd) => { console.log(`\n$ ${cmd}`); execSync(cmd, { stdio: 'inherit' }); };
 
 console.log('='.repeat(70));
 console.log('vectorless-rag — reproducible benchmarks');
-console.log('models:', JSON.stringify(MODELS));
+console.log('phase-1 models:   ', JSON.stringify(MODELS));
+console.log('financebench models:', JSON.stringify(FINANCEBENCH_MODELS));
 console.log('='.repeat(70));
 
 // --- 1. Structure table (zero LLM calls, deterministic) --------------------
@@ -40,7 +41,8 @@ console.log(`\n${'='.repeat(70)}`);
 console.log('LLM-path tables — need an API key; reproduce with:\n');
 console.log('  # Measured tier-3 + retrieval (Opus 4.8; ~$1-2)');
 console.log('  node --env-file=.env bench/live-measure.mjs\n');
-console.log('  # FinanceBench head-to-head vs the tuned baseline (Opus 4.8; full 150 ≈ $70-90)');
-console.log('  node --env-file=.env bench/financebench/run.mjs --budget 95');
-console.log('  # a cheaper slice:  --questions 30 --budget 25');
+console.log('  # FinanceBench head-to-head vs the tuned baseline (full 150 ≈ $95)');
+console.log('  # answerer of record is claude-sonnet-5; use gpt-4o while Anthropic is unfunded:');
+console.log('  node --env-file=.env bench/financebench/run.mjs --budget 150 --answer-model gpt-4o');
+console.log('  # a cheaper slice:  --questions 30 --budget 25 --answer-model gpt-4o');
 console.log(`${'='.repeat(70)}`);

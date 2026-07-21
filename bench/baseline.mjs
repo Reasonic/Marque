@@ -29,10 +29,10 @@ import { record, guard } from './meter.mjs';
 const DEFAULTS = {
   chunkTokens: 1500,
   chunkOverlap: 150,
-  contextModel: 'claude-haiku-4-5', // cheap, per-chunk — as the recipe intends
+  contextModel: 'gpt-4.1-mini', // cheap, per-chunk, 1M window — as the recipe intends
   embedModel: 'text-embedding-3-small',
-  answerModel: 'claude-opus-4-8',
-  maxContextTokens: 150000, // cap the doc shown to the contextualizer (fits Haiku's window; some 10-Ks exceed 200k)
+  answerModel: 'gpt-4o',
+  maxContextTokens: 250000, // fits a full 10-K; a pure cost ceiling now, not a window limit
   topK: 5,          // chunks handed to the answerer
   poolVector: 20,   // candidates from each channel before fusion
   rrfK: 60,         // reciprocal-rank-fusion constant
@@ -41,6 +41,18 @@ const DEFAULTS = {
 
 const openai = createOpenAI();
 const anthropic = createAnthropic();
+
+/** Route a chat model id to its provider (Claude → Anthropic, else → OpenAI). */
+const chat = (id) => (/claude/i.test(id) ? anthropic(id) : openai(id));
+
+/** Stable per-document key so OpenAI caches the shared doc prefix across chunk
+ * calls. OpenAI does NOT cache automatically here (measured: 0% hit without a
+ * key, ~99% with one); Anthropic ignores it and uses cacheControl instead. */
+function docCacheKey(text) {
+  let h = 5381;
+  for (let i = 0; i < text.length; i += 997) h = ((h * 33) ^ text.charCodeAt(i)) >>> 0;
+  return `vlrag-ctx-${h.toString(36)}-${text.length}`;
+}
 
 /** Bounded-concurrency map — keeps provider calls under the rate limit. */
 async function mapPool(items, n, fn) {
@@ -111,12 +123,18 @@ ${chunk}
 </chunk>
 Give a short, succinct context (one or two sentences) to situate this chunk within the overall document, to improve search retrieval of the chunk. Answer only with the context and nothing else.`;
 
-/** One contextualization call; the document is prompt-cached across chunks. */
+/**
+ * One contextualization call; the document is prompt-cached across chunks. Both
+ * providers are driven from the same message: Anthropic caches via the per-block
+ * `cacheControl`, OpenAI via the call-level `promptCacheKey` (each provider
+ * ignores the other's hint).
+ */
 async function contextualize(docText, chunk, cfg) {
   const res = await generateText({
-    model: anthropic(cfg.contextModel),
+    model: chat(cfg.contextModel),
     maxOutputTokens: 150,
     maxRetries: 3,
+    providerOptions: cfg.cacheKey ? { openai: { promptCacheKey: cfg.cacheKey } } : undefined,
     messages: [{
       role: 'user',
       content: [
@@ -145,6 +163,7 @@ export async function buildIndex(docText, opts = {}) {
   if (countTokens(docText) > cfg.maxContextTokens) {
     ctxDoc = docText.slice(0, Math.floor(docText.length * cfg.maxContextTokens / countTokens(docText)));
   }
+  cfg.cacheKey = docCacheKey(ctxDoc); // route every chunk of this doc to one OpenAI cache
 
   // Prime the prompt cache with the first call, then fan out. Firing all the
   // calls concurrently would race before the cache is written, so each would
@@ -209,7 +228,7 @@ export async function answer(chunks, question, opts = {}) {
   const context = chunks.map((c, i) => `[${i + 1}] ${c.chunk}`).join('\n\n---\n\n');
   guard();
   const res = await generateText({
-    model: anthropic(cfg.answerModel),
+    model: chat(cfg.answerModel),
     maxOutputTokens: 1024,
     maxRetries: 3,
     prompt: `${ANSWER_PROMPT}\n\nExcerpts:\n${context}\n\nQuestion: ${question}`,

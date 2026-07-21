@@ -15,6 +15,8 @@ const PRICES = {
   'claude-haiku-4-5': [1, 5],
   'text-embedding-3-small': [0.02, 0],
   'text-embedding-3-large': [0.13, 0],
+  'gpt-4.1-mini': [0.4, 1.6],
+  'gpt-4o-mini': [0.15, 0.6],
   'gpt-4o': [2.5, 10],
 };
 
@@ -25,19 +27,25 @@ const state = {
   budget: Infinity,
 };
 
-/** price(id) → [inPerM, outPerM]; unknown models cost 0 but are still counted. */
+/**
+ * price(id) → [inPerM, outPerM]; unknown models cost 0 but are still counted.
+ * The longest (most specific) matching key wins, so `gpt-4o-mini` is not
+ * mis-priced as `gpt-4o` (its own name contains the shorter key as a substring).
+ */
 function price(id) {
-  const key = Object.keys(PRICES).find((k) => id?.includes(k));
-  return key ? PRICES[key] : [0, 0];
+  const keys = Object.keys(PRICES).filter((k) => id?.includes(k)).sort((a, b) => b.length - a.length);
+  return keys.length ? PRICES[keys[0]] : [0, 0];
 }
 
 export function setBudget(usd) { state.budget = usd; }
 
 /**
- * Record one call's usage and return the running total. The AI SDK reports the
- * cache split under `usage.inputTokenDetails` ({noCacheTokens, cacheReadTokens,
- * cacheWriteTokens}); Anthropic prices a cache write at 1.25× and a read at 0.1×
- * of base input. Calls without that breakdown (e.g. embeddings) bill all input
+ * Record one call's usage and return the running total. Both the Anthropic and
+ * OpenAI adapters report the cache split under `usage.inputTokenDetails`
+ * ({noCacheTokens, cacheReadTokens, cacheWriteTokens}) — verified empirically.
+ * A cache write costs 1.25× base input (Anthropic only; OpenAI reports none).
+ * The cache-read discount differs by provider: Anthropic reads at 0.1× base,
+ * OpenAI at 0.5×. Calls without that breakdown (e.g. embeddings) bill all input
  * at base rate.
  */
 export function record(modelId, usage = {}) {
@@ -48,8 +56,10 @@ export function record(modelId, usage = {}) {
   const cacheRead = det.cacheReadTokens || 0;
   const cacheWrite = det.cacheWriteTokens || 0;
   const fresh = det.noCacheTokens ?? Math.max(inTok - cacheRead - cacheWrite, 0);
+  // Cache-read discount by family: Anthropic 90% off, gpt-4.1 75% off, gpt-4o 50% off.
+  const readMult = /claude/i.test(modelId) ? 0.1 : /gpt-4\.1/i.test(modelId) ? 0.25 : 0.5;
 
-  const usd = (fresh * inP + cacheWrite * inP * 1.25 + cacheRead * inP * 0.1 + outTok * outP) / 1e6;
+  const usd = (fresh * inP + cacheWrite * inP * 1.25 + cacheRead * inP * readMult + outTok * outP) / 1e6;
   state.usd += usd;
   state.calls++;
   const m = state.byModel[modelId] ||= { calls: 0, in: 0, out: 0, cacheRead: 0, cacheWrite: 0, usd: 0 };
