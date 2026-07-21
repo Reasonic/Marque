@@ -12,7 +12,7 @@
  * document to reconstruct information that tier 1 reads directly from the file.
  */
 import { extract } from './extract/pdf.mjs';
-import { detectHeadings } from './structure/headings.mjs';
+import { detectHeadings, detectTrailingMatter } from './structure/headings.mjs';
 import { verifyAll, UNVERIFIED } from './structure/verify.mjs';
 import { adjudicate, inferStructure } from './structure/tier3.mjs';
 import { locateSections, buildTree } from './structure/sections.mjs';
@@ -56,6 +56,13 @@ export async function index(path, opts = {}) {
     if (inferred.entries.length) { entries = inferred.entries; tier = 'llm'; }
   }
 
+  // Back matter (References / Bibliography / Appendix) is routinely missing from
+  // a tier-1 outline. With no entry after it, the final section's span runs to
+  // the end of the document and swallows the references. A typography pass adds
+  // the missing boundary even when tier 1 supplied the structure.
+  const trailing = detectTrailingMatter(doc, entries);
+  if (trailing.length) entries = [...entries, ...trailing];
+
   let { entries: verified, tally, needsReview } = verifyAll(entries, doc.pages);
 
   // Tier 3b — adjudicate only what local verification could not confirm.
@@ -96,3 +103,4 @@ export async function index(path, opts = {}) {
 export { extract } from './extract/pdf.mjs';
 export { sectionText } from './structure/sections.mjs';
 export { query } from './retrieve/query.mjs';
+export { createLLM } from './llm/index.mjs';

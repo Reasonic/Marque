@@ -1,15 +1,28 @@
 #!/usr/bin/env node
-import { index, query } from '../src/index.mjs';
+import { index, query, createLLM } from '../src/index.mjs';
 
 const args = process.argv.slice(2);
 const json = args.includes('--json');
+const useLlm = args.includes('--llm');
 const qFlag = args.indexOf('--query');
 const question = qFlag !== -1 ? args[qFlag + 1] : null;
 const files = args.filter((a, i) => !a.startsWith('--') && !(qFlag !== -1 && i === qFlag + 1));
 
 if (!files.length) {
-  console.error('usage: vectorless <file.pdf ...> [--json] [--query "question"]');
+  console.error('usage: vectorless <file.pdf ...> [--json] [--query "question"] [--llm]');
+  console.error('  --llm  enable tier 3 and LLM retrieval via ANTHROPIC_API_KEY / OPENAI_API_KEY');
   process.exit(1);
+}
+
+// createLLM() throws with guidance if no provider key is configured.
+let llm = null;
+if (useLlm) {
+  try {
+    llm = createLLM();
+  } catch (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
 }
 
 const printTree = (nodes, depth = 0) => {
@@ -22,11 +35,12 @@ const printTree = (nodes, depth = 0) => {
 };
 
 for (const f of files) {
-  const r = await index(f);
+  const r = await index(f, { llm });
 
   if (question) {
-    // No llm configured: BM25 selection only, zero LLM calls.
-    const res = await query(r, question);
+    // Without --llm: BM25 selection only, zero LLM calls. With --llm: the
+    // selector and answerer run through the configured provider.
+    const res = await query(r, question, { llm });
     if (json) { console.log(JSON.stringify({ ...res, context: undefined }, null, 2)); continue; }
     console.log(`\n${r.doc_name} — "${question}"`);
     console.log(`  selection=${res.selection_by}  llm_calls=${res.tokens.llm_calls}  `

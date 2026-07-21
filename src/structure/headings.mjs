@@ -12,6 +12,14 @@ const NUMBERED = /^(\d+(?:\.\d+)*)\.?\s*(\S.*)$/;
 const APPENDIX = /^(?:Appendix\s+)?([A-Z])(?:\.\d+)*\s+([A-Z]\S*.*)$/;
 const KEYWORD = /^(abstract|introduction|conclusions?|references|bibliography|acknowledge?ments?|appendix|summary|discussion|methods?|results?|related work)\b/i;
 
+// Back matter a tier-1 outline routinely omits. Detected on its own so a final
+// outline section does not run to the end of the document (see detectTrailingMatter).
+const TRAILING = /^(references|bibliography|appendix)\b/i;
+
+// A heading that ends a sentence is complete; one that does not can be continued
+// by the next line — i.e. it is one physical line of a multi-line title.
+const TERMINAL = /[.!?]$/;
+
 const MAX_HEADING_CHARS = 90;
 const SIZE_EPSILON = 0.4;
 
@@ -60,13 +68,49 @@ function sizeDepths(candidates, body) {
   return map;
 }
 
+/**
+ * Merge a heading that wrapped onto consecutive lines back into one entry.
+ *
+ * A wrapped title (BERT's appendix header is three lines) surfaces as several
+ * candidates on adjacent lines at the same size and page, where each line but
+ * the last does not end in terminal punctuation. Only a plain size-driven line
+ * ('font-size') is absorbed — never a line carrying its own structural signal
+ * (numbered/appendix/keyword) — so two distinct headings are never fused. The
+ * `_y` guard (a continuation sits below its opener) rejects a same-page column
+ * break, where the next line jumps back to the top of the next column.
+ *
+ * Candidates carry `_line` (index in doc.lines) and `_y`; both are extended to
+ * the run's last line as it grows, and stripped by the caller.
+ */
+function mergeWrapped(candidates) {
+  const out = [];
+  for (const c of candidates) {
+    const prev = out[out.length - 1];
+    if (prev
+      && c.signal === 'font-size'
+      && c._line === prev._line + 1
+      && c.page === prev.page
+      && c.size === prev.size
+      && c._y < prev._y
+      && !TERMINAL.test(prev.title)) {
+      prev.title = `${prev.title} ${c.title}`;
+      prev._line = c._line;
+      prev._y = c._y;
+      continue;
+    }
+    out.push(c);
+  }
+  return out;
+}
+
 export function detectHeadings(doc) {
   const lines = doc.lines;
   if (!lines.length) return [];
   const body = bodySize(lines);
 
   const candidates = [];
-  for (const l of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
     if (l.text.length > MAX_HEADING_CHARS || l.text.length < 2) continue;
 
     const num = NUMBERED.exec(l.text);
@@ -74,34 +118,64 @@ export function detectHeadings(doc) {
     const bigger = l.size > body + SIZE_EPSILON;
     const keyword = KEYWORD.test(l.text);
 
+    let c = null;
     // A numbered line only counts as a heading if it is also typographically
     // distinct — otherwise ordinary numbered list items are swept up.
     if (num && (bigger || l.bold)) {
-      candidates.push({
-        title: l.text,
-        page: l.page,
-        size: l.size,
-        depth: num[1].split('.').length - 1,
-        confidence: 'high',
-        signal: 'numbered',
-      });
+      c = { title: l.text, page: l.page, size: l.size, depth: num[1].split('.').length - 1, confidence: 'high', signal: 'numbered' };
     } else if (app && (bigger || l.bold)) {
-      candidates.push({ title: l.text, page: l.page, size: l.size, depth: 0, confidence: 'high', signal: 'appendix' });
+      c = { title: l.text, page: l.page, size: l.size, depth: 0, confidence: 'high', signal: 'appendix' };
     } else if (bigger && l.page > 1) {
       // Front matter (title, authors, affiliations, emails) is typographically
       // large but is not document structure, so size alone is not trusted on
       // the first page — numbering and keywords still are.
-      candidates.push({ title: l.text, page: l.page, size: l.size, depth: null, confidence: 'medium', signal: 'font-size' });
+      c = { title: l.text, page: l.page, size: l.size, depth: null, confidence: 'medium', signal: 'font-size' };
     } else if (keyword && (l.bold || bigger)) {
-      candidates.push({ title: l.text, page: l.page, size: l.size, depth: 0, confidence: 'medium', signal: 'keyword' });
+      c = { title: l.text, page: l.page, size: l.size, depth: 0, confidence: 'medium', signal: 'keyword' };
     }
+    if (c) { c._line = i; c._y = l.y; candidates.push(c); }
   }
 
-  const depths = sizeDepths(candidates, body);
-  for (const c of candidates) {
+  const merged = mergeWrapped(candidates);
+
+  const depths = sizeDepths(merged, body);
+  for (const c of merged) {
     if (c.depth === null) c.depth = depths.get(c.size) ?? 0;
+    delete c._line;
+    delete c._y;
   }
-  return candidates;
+  return merged;
+}
+
+/**
+ * Detect back matter (References / Bibliography / Appendix) that a tier-1
+ * outline left out. Returns depth-0 boundary entries for any such heading at or
+ * after the last structural entry that is not already present.
+ *
+ * Without this, a final outline section has no following entry, so locateSections
+ * runs its span to the end of the document — Attention's "Conclusion" otherwise
+ * swallows the references (p10-15). Zero LLM calls; reuses detectHeadings' signals.
+ */
+export function detectTrailingMatter(doc, entries) {
+  const lines = doc.lines;
+  if (!lines?.length || !entries.length) return [];
+  const body = bodySize(lines);
+  const lastPage = entries[entries.length - 1].page;
+  const key = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const seen = new Set(entries.map((e) => key(e.title)));
+
+  const found = [];
+  for (const l of lines) {
+    if (l.page < lastPage) continue;
+    if (l.text.length < 2 || l.text.length > MAX_HEADING_CHARS) continue;
+    if (!TRAILING.test(l.text)) continue;
+    if (!(l.bold || l.size > body + SIZE_EPSILON)) continue;
+    const k = key(l.text);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    found.push({ title: l.text, page: l.page, size: l.size, depth: 0, confidence: 'medium', signal: 'keyword' });
+  }
+  return found;
 }
 
 export { bodySize };

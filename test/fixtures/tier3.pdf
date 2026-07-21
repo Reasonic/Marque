@@ -1,0 +1,83 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Length 4038 >>
+stream
+BT /F1 11 Tf 1 0 0 1 72 740 Tm (Notes on Distributed Cache Invalidation) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 710 Tm (Overview) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 695 Tm (This note records how a small distributed cache keeps its entries consistent when several) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 680 Tm (writers touch the same keys. It assumes no shared clock and no central coordinator, which is) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 665 Tm (the setting most services actually run in.) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 650 Tm (The goal is not a proof but a shared vocabulary, so the later sections can refer back to the) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 635 Tm (same terms without redefining them each time.) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 605 Tm (Cache Coherence) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 590 Tm (A read should never return a value older than one the same client has already observed. That) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 575 Tm (single rule, monotonic reads, is weaker than linearizability but strong enough for) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 560 Tm (session-scoped work, and it is cheap to provide with per-client version stamps.) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 545 Tm (Coherence across clients is a separate question and is handled by the invalidation path) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 530 Tm (rather than by the read path.) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 500 Tm (Invalidation Strategies) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 485 Tm (Two families exist. Write-through invalidation evicts an entry the moment its backing record) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 470 Tm (changes, trading write latency for freshness. Lease-based invalidation lets an entry live) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 455 Tm (until its lease expires, trading freshness for far less coordination traffic.) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 440 Tm (The cache described here uses leases for hot keys and write-through for the small set of) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 425 Tm (keys marked authoritative, because their staleness budget is effectively zero.) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 395 Tm (Write Propagation) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 380 Tm (When a record changes, the writer publishes the key and a monotonically increasing version) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 365 Tm (to a fan-out topic. Each cache node applies the eviction only if the published version) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 350 Tm (exceeds the version it currently holds, so reordered messages are harmless.) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 335 Tm (Propagation is best-effort. A node that misses a message will still converge once the entry) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 320 Tm (lease expires, which bounds the worst-case staleness to the lease duration.) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 290 Tm (Failure Modes) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 275 Tm (The interesting failures are partial. A node partitioned from the fan-out topic keeps) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 260 Tm (serving reads from leases that have not yet expired, so it can serve values other nodes have) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 245 Tm (already invalidated. This is acceptable precisely because leases are short.) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 230 Tm (A writer that crashes after mutating the record but before publishing leaves every cache) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 215 Tm (stale until the lease expires. Shortening the lease narrows this window at the cost of more) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 200 Tm (misses.) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 170 Tm (Evaluation) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 155 Tm (On a synthetic workload with a ninety-ten read-write split, lease durations between two and) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 140 Tm (ten seconds kept the observed staleness under one lease duration in every run, while) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 125 Tm (coordination traffic fell by roughly an order of magnitude against write-through everywhere.) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 110 Tm (The authoritative-key set stayed small enough that its write-through cost was not measurable) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 95 Tm (against the background load.) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 4 0 R >>
+endobj
+6 0 obj
+<< /Length 406 >>
+stream
+BT /F1 11 Tf 1 0 0 1 72 740 Tm (Closing Notes) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 725 Tm (None of this is novel; it is the folklore written down so the next person does not have to) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 710 Tm (reconstruct it from the code. The one non-obvious point is that reordered invalidations are) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 695 Tm (safe as long as versions are compared, never assumed.) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 6 0 R >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000191 00000 n 
+0000004281 00000 n 
+0000004407 00000 n 
+0000004864 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+4990
+%%EOF

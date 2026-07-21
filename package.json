@@ -14,8 +14,12 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.16",
+    "@ai-sdk/openai": "^4.0.16",
+    "ai": "^7.0.32",
     "gpt-tokenizer": "^3.4.0",
-    "pdfjs-dist": "^6.1.200"
+    "pdfjs-dist": "^6.1.200",
+    "zod": "^4.4.3"
   },
   "bin": {
     "vectorless": "bin/cli.mjs"
