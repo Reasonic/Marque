@@ -32,6 +32,9 @@ const DEFAULT_MODELS = { anthropic: 'claude-opus-4-8', openai: 'gpt-4o' };
  */
 export const sanitize = (s) => String(s).replace(/<\|/g, '<\u200b|');
 
+/** Query-expansion instruction \u2014 see the `expand` method below. */
+const EXPAND_PROMPT = `A lexical (keyword) search engine will look for the answer to this question in a document. List extra search terms that may appear in the document *instead of* the question's own words: synonyms, domain aliases, and the formal labels a document uses. For example "capital expenditures" often appears as "purchases of property, plant and equipment" or "capex". Reply with a short space-separated list of terms and phrases only \u2014 no numbering, no explanation.`;
+
 function inferProvider(opts) {
   if (opts.provider) return opts.provider;
   if (opts.apiKey) return 'anthropic'; // key given but provider unstated
@@ -78,6 +81,7 @@ function resolveModel(opts) {
  *   json: (prompt: string, schema?: object) => Promise<any>,
  *   select: (prompt: string, k?: number) => Promise<string[]>,
  *   answer: (prompt: string) => Promise<string>,
+ *   expand: (query: string) => Promise<string>,
  *   model: object,
  * }}
  */
@@ -122,6 +126,20 @@ export function createLLM(opts = {}) {
       });
       report(usage, 'answer');
       return text;
+    },
+
+    /**
+     * Retrieval query expansion. Returns extra search terms and synonyms/aliases
+     * the document may use instead of the question's wording (e.g. "capital
+     * expenditures" ~ "purchases of property, plant and equipment"), so lexical
+     * retrieval can bridge a vocabulary gap without embeddings. Free-form text.
+     */
+    async expand(prompt) {
+      const { text, usage } = await generateText({
+        model, maxRetries, maxOutputTokens: 120, prompt: `${EXPAND_PROMPT}\n\nQuestion: ${sanitize(prompt)}`,
+      });
+      report(usage, 'expand');
+      return text.trim();
     },
 
     model,
