@@ -11,7 +11,7 @@
  * PageIndex starts at tier 3 unconditionally, spending ~200 LLM calls per
  * document to reconstruct information that tier 1 reads directly from the file.
  */
-import { extract } from './extract/pdf.mjs';
+import { extract } from './extract/any.mjs';
 import { detectHeadings, detectTrailingMatter } from './structure/headings.mjs';
 import { verifyAll, UNVERIFIED } from './structure/verify.mjs';
 import { adjudicate, inferStructure } from './structure/tier3.mjs';
@@ -100,7 +100,7 @@ export async function index(path, opts = {}) {
   };
 }
 
-export { extract } from './extract/pdf.mjs';
+export { extract } from './extract/any.mjs';
 export { sectionText } from './structure/sections.mjs';
 export { query } from './retrieve/query.mjs';
 export { createLLM } from './llm/index.mjs';
