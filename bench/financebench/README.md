@@ -258,3 +258,104 @@ node --env-file=.env bench/financebench/run.mjs --budget 150 --answer-model gpt-
 
 Every graded answer — question, gold, both systems' answers, and the grader's verdict
 and reason — is in `results.json` for audit.
+
+---
+
+# Head-to-head vs PageIndex (the 98.7% claim)
+
+PageIndex / Mafin 2.5 report **98.7% on FinanceBench** — the headline that anchors the
+"vectorless RAG" pitch. This section runs the *same* benchmark with Marque and puts the
+two side by side, **without re-running PageIndex**: their per-question answers are
+published, so we reuse them and grade both systems identically.
+
+```bash
+node --env-file=.env bench/financebench/pageindex-compare.mjs --budget 15
+```
+
+## What the 98.7% actually is — read before comparing
+
+It is not a retrieval score:
+
+- **End-to-end QA**, not retrieval. The number is Mafin 2.5's full pipeline (PageIndex
+  tree navigation → a strong answerer) over FinanceBench's 150-question public set.
+- **A lenient judge.** Their grader (`eval.py::check_answer_equivalence`, ported
+  verbatim in [`mafin-grade.mjs`](mafin-grade.mjs)) marks an answer correct if the gold
+  "can be inferred or generated from" it, with rounding and format tolerance.
+- **OR'd across three judges.** The published 98.7% takes `any()` over `gpt-4o` +
+  `o1-mini` + `o3-mini` (≈148/150), with human adjudication for the ambiguous few.
+
+For context, GPT-4o alone scores ~31% and vector RAG 30–50% on FinanceBench. The distance
+from ~40% to 98.7% is mostly the answerer and the lenient grading, not the retriever — so
+the only honest comparison holds those fixed and varies **retrieval**.
+
+## How we compare, on their terms
+
+- **Reuse, don't re-run.** PageIndex's answers come from
+  [`VectifyAI/Mafin2.5-FinanceBench/result_gpt4o.json`](https://github.com/VectifyAI/Mafin2.5-FinanceBench)
+  (fetched, cached under `data/`, never committed). Re-running their ~200-calls-per-document
+  pipeline would cost hundreds of dollars and change nothing.
+- **Same answerer.** Both systems answer with **gpt-4o** — the base model behind that
+  result file — so the only variable is retrieval.
+- **Same judges, applied to both.** Every answer is graded by (1) PageIndex's own judge and
+  (2) our strict-agreement judge, as a robustness check. Identical grading, so any leniency
+  applies equally.
+- **Same setting.** Mafin puts all filings in one database; so do we. Marque indexes all 84
+  filings at **tier 1/2 — zero LLM calls, $0** — into one BM25 space, routes each question to
+  its filing by **company + fiscal year** ([`router.mjs`](router.mjs)), retrieves sections
+  within it, and answers. A fixed pipeline (route → select → answer), no agent loop. PageIndex
+  rebuilds every document's tree with an LLM first.
+
+## Result — one measured run, 150 questions, gpt-4o answerer
+
+| system | PageIndex's own judge | our strict judge | vector DB? | index cost |
+|---|---|---|---|---|
+| PageIndex (reused `result_gpt4o.json`) | **92.7%** | **71.3%** | no | ~200 LLM calls/doc |
+| **Marque** (structure-first) | **50.7%** | **38.7%** | **no** | **0 LLM calls · $0** |
+| *PageIndex published headline* | *98.7%* | *—* | | |
+
+The published 98.7% is their **3-judge OR + human** protocol; graded with a single `gpt-4o`
+judge — the same judge we apply to Marque — their own file scores **92.7%**. We report both,
+and the 98.7% at face value.
+
+By question type, under PageIndex's judge:
+
+| type | n | Marque | PageIndex |
+|---|---|---|---|
+| metrics-generated | 50 | 52% | 98% |
+| domain-relevant   | 50 | 54% | 96% |
+| novel-generated   | 50 | 46% | 84% |
+
+**Marque loses, clearly, and the diagnosis is precise.** Two findings, both honest:
+
+- **Structure-first is not a substitute for a tuned financial-QA pipeline on tables.**
+  Marque routes to the correct filing 98.7% of the time and picks a section from it as the top
+  hit 76.7% of the time — but even when the right filing is chosen, it answers only **58%** of
+  the questions, and **42 of 150** of its answers are "that figure is not in the retrieved
+  sections". The answers are numbers inside financial-statement tables, and a ratio needs two
+  of them (the balance sheet *and* the cash-flow statement); lexical retrieval plus text
+  extraction from mangled table text is where this breaks. This is the same boundary the
+  contextual-baseline comparison above draws — restated against PageIndex's flagship number, on
+  their own grader.
+- **The cross-document setting is nearly free.** Marque's **38.7% strict** here is essentially
+  its **~36% single-document** strict score elsewhere in this benchmark — so routing across 84
+  filings, with no vector store, cost no accuracy (it is if anything marginally higher, within
+  run-to-run noise). The company/year router holds up.
+
+## Cost and reproducibility
+
+The whole 150-question Marque run — indexing all 84 filings, routing, answering, **and**
+grading both systems with both judges — metered **$5.65**. Marque's *indexing* is **0 LLM
+calls, $0**; the spend is gpt-4o answering and grading. PageIndex's side cost us nothing to
+include, because we reused their published answers rather than rebuilding ~200 trees per
+document.
+
+Every graded answer — both systems, both judges, the routed filing — is in
+`results-pageindex.json` for audit.
+
+**Caveats specific to this run:**
+- Single measured run; gpt-4o is not seed-deterministic, so re-running moves the numbers a few
+  points. A stronger answerer would lift *both* systems.
+- Two FinanceBench questions name no company at all ("was there a drop between FY2023 and Q2
+  FY2024?"); lexical routing cannot place those, and they are counted against Marque.
+- The reused PageIndex answers are gpt-4o only; their DeepSeek-v3 file and the 3-judge OR are
+  what produce the 98.7% headline, which we cite but do not recompute.
