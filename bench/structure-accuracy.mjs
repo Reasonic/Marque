@@ -27,6 +27,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { extract } from '../src/extract/pdf.mjs';
 import { detectHeadings } from '../src/structure/headings.mjs';
+import { wilson } from './stats.mjs';
 
 const MIN_GOLD = 5;        // a document needs a real outline to serve as gold
 const PAGE_TOL = 1;        // outline destination vs. rendered heading line, in pages
@@ -144,7 +145,8 @@ const mean = (k) => rows.reduce((a, r) => a + r[k], 0) / rows.length;
 
 console.log(`\n${'-'.repeat(92)}`);
 console.log(`docs: ${rows.length}   gold headings: ${sum('gold')}   typography headings: ${sum('pred')}   matched: ${sum('matched')}`);
-console.log(`\nMICRO (heading-weighted):  recall ${pct(microR)}   precision* ${pct(microP)}   F1 ${pct(microF1)}`);
+const [rLo, rHi] = wilson(sum('matched'), sum('gold'));
+console.log(`\nMICRO (heading-weighted):  recall ${pct(microR)} (95% CI [${pct(rLo)}, ${pct(rHi)}])   precision* ${pct(microP)}   F1 ${pct(microF1)}`);
 console.log(`MACRO (document-weighted): recall ${pct(mean('recall'))}   precision* ${pct(mean('precision'))}   F1 ${pct(mean('f1'))}`);
 
 // The failure is concentrated, not diffuse: split the corpus at "did tier-2 find

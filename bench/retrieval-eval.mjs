@@ -10,6 +10,7 @@
  */
 import { index } from '../src/index.mjs';
 import { query } from '../src/retrieve/query.mjs';
+import { wilson } from './stats.mjs';
 
 const SUITE = {
   'attn.pdf': [
@@ -69,11 +70,14 @@ for (const [file, cases] of Object.entries(SUITE)) {
   }
 }
 
+// Wilson 95% CI — with only 17 queries the point estimates carry real width, and
+// hiding that would be the opposite of the rigour the eval is here to provide.
+const ci = (k) => { const [lo, hi] = wilson(k, total); return `[${(100 * lo).toFixed(0)}%, ${(100 * hi).toFixed(0)}%]`; };
 console.log(`\n${'='.repeat(60)}`);
 console.log(`queries                    ${total}`);
-console.log(`in shortlist (top ${PREFILTER})       ${inShortlist}/${total}  (${(100 * inShortlist / total).toFixed(0)}%)`);
-console.log(`selected     (top ${SELECT})        ${hitsK}/${total}  (${(100 * hitsK / total).toFixed(0)}%)`);
-console.log(`ranked first               ${hits1}/${total}  (${(100 * hits1 / total).toFixed(0)}%)`);
+console.log(`in shortlist (top ${PREFILTER})       ${inShortlist}/${total}  (${(100 * inShortlist / total).toFixed(0)}%)  95% CI ${ci(inShortlist)}`);
+console.log(`selected     (top ${SELECT})        ${hitsK}/${total}  (${(100 * hitsK / total).toFixed(0)}%)  95% CI ${ci(hitsK)}`);
+console.log(`ranked first               ${hits1}/${total}  (${(100 * hits1 / total).toFixed(0)}%)  95% CI ${ci(hits1)}`);
 console.log(`MRR (over shortlist)       ${(rr / total).toFixed(3)}`);
 if (misses.length) {
   console.log(`\nmisses:`);

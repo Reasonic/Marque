@@ -183,6 +183,40 @@ Reproduce (RAPTOR repo + venv are fetched locally, never committed):
 node --env-file=.env bench/financebench/raptor_run.mjs --budget 40
 ```
 
+### Is any of this significant?
+
+A single 142-question run carries real sampling uncertainty, so the honest way to
+read the tables above is with confidence intervals and a paired significance test,
+not bare point estimates. [`significance.mjs`](significance.mjs) computes both from
+the result files, no API calls:
+
+| system | strict agreement | 95% Wilson CI |
+|---|---|---|
+| baseline (contextual)  | 43.7% | [35.8%, 51.9%] |
+| ours (expansion)       | 36.0% | [28.8%, 43.9%] |
+| RAPTOR (tree/summary)  | 34.0% | [26.9%, 41.9%] |
+
+The intervals overlap heavily. A paired **McNemar** test — which looks only at the
+questions where two systems *disagree* — makes it precise:
+
+| comparison | discordant (A>B / B>A) | p | verdict |
+|---|---|---|---|
+| ours vs RAPTOR     | 24 / 21 | 0.77 | **not significant** — a tie |
+| baseline vs ours   | 30 / 19 | 0.15 | **not significant** on this run |
+| baseline vs RAPTOR | 22 / 9  | 0.03 | significant — baseline ahead |
+
+Two conclusions follow, and both are more careful than "structure-first loses":
+
+- **Ours ties RAPTOR** (p = 0.77): a structure-first pass with *no vector store* is
+  statistically indistinguishable from an embedding-based tree-RAG.
+- **The baseline's lead over ours does not reach significance** (p = 0.15) on this
+  run. That is *not* a claim the two are equal — the point estimate still favours the
+  baseline, and the baseline *is* significantly ahead of RAPTOR — but the 8-point gap
+  cannot be asserted from a single run. Confirming or closing it needs repeated runs
+  (run-to-run LLM variance is a separate source of noise this test does not capture).
+
+Reproduce: `node bench/financebench/significance.mjs`.
+
 This is the boundary the benchmark exists to draw. The library's claim is that you do
 not need a vector database to *navigate* a structured document, and the
 structure-extraction numbers elsewhere in this repo hold. FinanceBench tests a harder
