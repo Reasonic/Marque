@@ -6,7 +6,7 @@ import globals from 'globals';
 // formatting alone. Empty catch blocks are allowed — pdf.mjs deliberately
 // swallows unresolvable-destination errors with a comment.
 export default [
-  { ignores: ['node_modules/**', 'types/**', 'bench/fixtures/**'] },
+  { ignores: ['node_modules/**', 'types/**', 'bench/fixtures/**', 'bench/financebench/raptor/**', 'bench/financebench/raptor-venv/**'] },
   js.configs.recommended,
   {
     languageOptions: {
