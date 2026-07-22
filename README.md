@@ -14,6 +14,19 @@ Retrieval usually starts by *destroying* information. A document arrives with an
 
 Marque takes the opposite path. It **reads the structure the document already has** — the embedded PDF outline, the Word heading styles, the Markdown `#`s, the HTML tags, the EPUB spine — builds an exact tree in **milliseconds**, and answers by navigating that tree. No vector database to stand up. No embeddings to compute. No chunking to tune. An LLM is a *last resort*, used only for the rare file that genuinely hides its structure — **2 sections out of 122** across our fixtures.
 
+```mermaid
+flowchart LR
+    doc(["📄 A document that<br/>already has an outline"])
+    doc --> emb["Vector RAG —<br/>chunk + embed → vector DB"]
+    doc --> pi["PageIndex —<br/>~200 LLM calls → rebuild the tree"]
+    doc --> ocr["ML parsers —<br/>OCR / layout ML → parse the tree"]
+    doc ==>|reads it| mq["Marque —<br/>the outline it already ships · exact · $0"]
+    classDef rebuild fill:#f6ecdd,stroke:#97590a,color:#5a3607;
+    classDef read fill:#e7f4ee,stroke:#0b7a53,stroke-width:2px,color:#0b3d2a;
+    class emb,pi,ocr rebuild
+    class mq read
+```
+
 ## ⚙️ How It Works — cheapest tier wins
 
 Structure is recovered in tiers, cheapest first. A document exits at the first tier that can read it — and most never reach the LLM:
@@ -44,6 +57,22 @@ Every section is then **verified locally** against its own start page. A mismatc
 
 Retrieval is a **fixed two-call pipeline** — BM25 over the structure → optional LLM selection → a budgeted, citable answer context — never an agent loop that re-sends the whole tree on every turn.
 
+```mermaid
+flowchart TD
+    subgraph m ["Marque · fixed two calls"]
+        direction LR
+        mq(["❓"]) --> b1["BM25 over sections<br/>0 tokens"] --> s1["select from titles<br/>1 small call"] --> a1["answer from<br/>budgeted context"]
+    end
+    subgraph l ["Agentic tree-RAG · the loop re-sends everything"]
+        direction LR
+        lq(["❓"]) --> g1["get tree"] --> g2["fetch pages<br/>+ resend tree"] --> g3["fetch more<br/>+ resend tree + pages"] --> g4["⋯ 4.4–8.3×<br/>the tokens"]
+    end
+    classDef fixed fill:#e7f4ee,stroke:#0b7a53,color:#0b3d2a;
+    classDef costly fill:#f6ecdd,stroke:#97590a,color:#5a3607;
+    class b1,s1,a1 fixed
+    class g2,g3,g4 costly
+```
+
 ## 🎯 Why Marque
 
 Every other approach **reconstructs** what the document already contains — with an LLM, with embeddings, or with an OCR/layout model. Marque **reads** it. Here's the difference against each alternative, and what it saves you:
@@ -71,6 +100,18 @@ npm run bench:non-pdf   →   59/59 sections verified · 10 documents · 0 LLM c
 ## 🌲 The Index
 
 `index()` returns a character-exact tree — sections you can address and retrieve directly, each tagged with how its structure was found and whether it verified:
+
+```mermaid
+flowchart TD
+    root(["📄 attn.pdf · tier: outline · 0 LLM"])
+    root --> intro["Introduction · p2<br/>✓ verified"]
+    root --> model["Model Architecture · p2–5<br/>✓ verified"]
+    model --> attn["Attention · p3–5<br/>✓ verified"]
+    classDef v fill:#e7f4ee,stroke:#0b7a53,color:#0b3d2a;
+    class intro,model,attn v
+```
+
+...and the same tree as data:
 
 ```json
 {
