@@ -12,6 +12,13 @@ const NUMBERED = /^(\d+(?:\.\d+)*)\.?\s*(\S.*)$/;
 const APPENDIX = /^(?:Appendix\s+)?([A-Z])(?:\.\d+)*\s+([A-Z]\S*.*)$/;
 const KEYWORD = /^(abstract|introduction|conclusions?|references|bibliography|acknowledge?ments?|appendix|summary|discussion|methods?|results?|related work)\b/i;
 
+// SEC 10-K structural conventions. "Item 7. Management's Discussion…" and
+// "PART II" are headings *by convention*, whatever their font — and most 10-Ks
+// render them bold at body size, invisible to a pure size test. Anchored at line
+// start, so an in-text reference ("see Item 7") is never swept up.
+const ITEM = /^Item\s+\d{1,2}[A-Za-z]?(?:\([a-z0-9]+\))?[.:]?\s+\S/i;
+const PART = /^Part\s+[IVXLC]{1,4}(?:[.:]|\s|$)/i;
+
 // Back matter a tier-1 outline routinely omits. Detected on its own so a final
 // outline section does not run to the end of the document (see detectTrailingMatter).
 const TRAILING = /^(references|bibliography|appendix)\b/i;
@@ -103,6 +110,22 @@ function mergeWrapped(candidates) {
   return out;
 }
 
+/**
+ * Drop candidates whose title repeats across the document — running headers,
+ * footers and figure labels ("Input-Input Layer5" on every attention plot) look
+ * like headings line-by-line but are not structure. Only the weak, size/weight
+ * signals are filtered; a numbered, appendix, keyword, item or part heading is
+ * trusted even if its text recurs. Five is generous: a real section title almost
+ * never repeats five times, a running header repeats once per page.
+ */
+function dropRepeated(candidates) {
+  const key = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const freq = new Map();
+  for (const c of candidates) freq.set(key(c.title), (freq.get(key(c.title)) || 0) + 1);
+  const weak = new Set(['font-size', 'bold']);
+  return candidates.filter((c) => !(weak.has(c.signal) && freq.get(key(c.title)) >= 5));
+}
+
 export function detectHeadings(doc) {
   const lines = doc.lines;
   if (!lines.length) return [];
@@ -115,14 +138,32 @@ export function detectHeadings(doc) {
 
     const num = NUMBERED.exec(l.text);
     const app = !num && APPENDIX.exec(l.text);
+    const item = !num && ITEM.test(l.text);
+    const part = !num && !item && PART.test(l.text);
     const bigger = l.size > body + SIZE_EPSILON;
     const keyword = KEYWORD.test(l.text);
 
+    // A multi-level section number ("3.1 Attention") is a strong enough heading
+    // signal to trust at body size — the dotted numbering, plus a title that
+    // opens with a capital, is not something ordinary running text produces. This
+    // is what recovers subsections that render at body size (Transformer §3.1).
+    const subNum = num && num[1].includes('.') && /^[A-Z]/.test(num[2]);
+    // A bold, short, title-like line at body size — how many 10-Ks mark section
+    // heads ("Offerings", "Human Capital") with no size change at all.
+    const boldHead = l.bold && !num && !bigger && l.page > 1
+      && l.text.length <= 60 && /^[A-Z]/.test(l.text)
+      && !TERMINAL.test(l.text) && l.text.split(/\s+/).length <= 8;
+
     let c = null;
     // A numbered line only counts as a heading if it is also typographically
-    // distinct — otherwise ordinary numbered list items are swept up.
-    if (num && (bigger || l.bold)) {
+    // distinct — bigger, bold, or a dotted subsection number — otherwise ordinary
+    // numbered list items are swept up.
+    if (num && (bigger || l.bold || subNum)) {
       c = { title: l.text, page: l.page, size: l.size, depth: num[1].split('.').length - 1, confidence: 'high', signal: 'numbered' };
+    } else if (part) {
+      c = { title: l.text, page: l.page, size: l.size, depth: 0, confidence: 'high', signal: 'part' };
+    } else if (item) {
+      c = { title: l.text, page: l.page, size: l.size, depth: 1, confidence: 'high', signal: 'item' };
     } else if (app && (bigger || l.bold)) {
       c = { title: l.text, page: l.page, size: l.size, depth: 0, confidence: 'high', signal: 'appendix' };
     } else if (bigger && l.page > 1) {
@@ -132,11 +173,13 @@ export function detectHeadings(doc) {
       c = { title: l.text, page: l.page, size: l.size, depth: null, confidence: 'medium', signal: 'font-size' };
     } else if (keyword && (l.bold || bigger)) {
       c = { title: l.text, page: l.page, size: l.size, depth: 0, confidence: 'medium', signal: 'keyword' };
+    } else if (boldHead) {
+      c = { title: l.text, page: l.page, size: l.size, depth: 1, confidence: 'low', signal: 'bold' };
     }
     if (c) { c._line = i; c._y = l.y; candidates.push(c); }
   }
 
-  const merged = mergeWrapped(candidates);
+  const merged = dropRepeated(mergeWrapped(candidates));
 
   const depths = sizeDepths(merged, body);
   for (const c of merged) {

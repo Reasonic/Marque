@@ -52,6 +52,57 @@ test('1.4: a distinct heading on non-consecutive lines is never merged', () => {
   assert.deepEqual(titles, ['First Heading', 'Second Heading']);
 });
 
+// --- tier-2 body-size heading recovery (adversarial guards) -----------------
+
+test('tier-2: dotted body-size subsections are recovered, list items are not', () => {
+  const body = (t) => ({ page: 2, y: 500, size: 10, bold: false, text: t });
+  const doc = {
+    lines: [
+      { page: 2, y: 700, size: 12, bold: true, text: '3 Model Architecture' },
+      body('3.1 Encoder and Decoder Stacks'),                                  // dotted subsection at body size → heading
+      body('a long line of ordinary body copy that dominates the page by character count here'),
+      body('1. First we compute the gradient and then apply it across the whole network of weights'), // single-level list item → not
+      body('2.5 million shares were issued during the period to employees of the company this year'),  // numeric, lowercase title → not
+    ],
+  };
+  const titles = detectHeadings(doc).map((c) => c.title);
+  assert.ok(titles.includes('3.1 Encoder and Decoder Stacks'), 'a dotted body-size subsection is a heading');
+  assert.ok(!titles.some((t) => /million shares/.test(t)), 'a numeric line is not a heading');
+  assert.ok(!titles.some((t) => /First we compute/.test(t)), 'a numbered list item is not a heading');
+});
+
+test('tier-2: SEC Item/Part headings are recovered at body size; references are not', () => {
+  const body = (t, bold = false) => ({ page: 3, y: 500, size: 10, bold, text: t });
+  const doc = {
+    lines: [
+      body('PART I'),
+      body('Item 1. Business', true),
+      body('Item 1A. Risk Factors', true),
+      body('For a discussion see Item 7 of this report and the accompanying notes to the statements'), // in-text reference → not
+      body('Items sold during the period increased materially over the comparable prior fiscal year'), // "Items", not the convention → not
+    ],
+  };
+  const titles = detectHeadings(doc).map((c) => c.title);
+  assert.ok(titles.includes('PART I'));
+  assert.ok(titles.includes('Item 1. Business'));
+  assert.ok(titles.includes('Item 1A. Risk Factors'));
+  assert.ok(!titles.some((t) => /see Item 7/.test(t)), 'an in-text reference is not a heading');
+  assert.ok(!titles.some((t) => /Items sold/.test(t)), 'the word "Items" is not the Item convention');
+});
+
+test('tier-2: a bold short title is a heading; bold running text is not', () => {
+  const body = (t, bold = false) => ({ page: 3, y: 500, size: 10, bold, text: t });
+  const doc = {
+    lines: [
+      body('Human Capital', true),                                                             // bold short title → heading
+      body('We are committed to fostering an inclusive workplace, and this sentence runs on.', true), // bold full sentence → not
+    ],
+  };
+  const titles = detectHeadings(doc).map((c) => c.title);
+  assert.ok(titles.includes('Human Capital'));
+  assert.ok(!titles.some((t) => /committed to fostering/.test(t)), 'a bold full sentence is not a heading');
+});
+
 // --- 1.5 trailing matter ----------------------------------------------------
 
 test('1.5: the final section stops before the references, not at doc end', async () => {
