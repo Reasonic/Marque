@@ -58,14 +58,19 @@ Every section is then **verified locally** against its own start page. A mismatc
 Retrieval is a **fixed two-call pipeline** — BM25 over the structure → optional LLM selection → a budgeted, citable answer context — never an agent loop that re-sends the whole tree on every turn.
 
 ```mermaid
-flowchart TD
-    subgraph m ["Marque · fixed two calls"]
-        direction LR
-        mq(["❓"]) --> b1["BM25 over sections<br/>0 tokens"] --> s1["select from titles<br/>1 small call"] --> a1["answer from<br/>budgeted context"]
+flowchart LR
+    subgraph m ["Marque — fixed, 2 LLM calls"]
+        direction TB
+        mq(["❓"]) --> b1["BM25 over sections<br/>0 tokens"]
+        b1 --> s1["select from titles<br/>1 small call"]
+        s1 --> a1["answer from<br/>budgeted context"]
     end
-    subgraph l ["Agentic tree-RAG · the loop re-sends everything"]
-        direction LR
-        lq(["❓"]) --> g1["get tree"] --> g2["fetch pages<br/>+ resend tree"] --> g3["fetch more<br/>+ resend tree + pages"] --> g4["⋯ 4.4–8.3×<br/>the tokens"]
+    subgraph l ["Agentic tree-RAG — a loop"]
+        direction TB
+        lq(["❓"]) --> g1["get tree"]
+        g1 --> g2["fetch pages<br/>+ resend tree"]
+        g2 --> g3["fetch more<br/>+ resend tree + pages"]
+        g3 --> g4["⋯ 4.4–8.3×<br/>the tokens"]
     end
     classDef fixed fill:#e7f4ee,stroke:#0b7a53,color:#0b3d2a;
     classDef costly fill:#f6ecdd,stroke:#97590a,color:#5a3607;
@@ -100,18 +105,6 @@ npm run bench:non-pdf   →   59/59 sections verified · 10 documents · 0 LLM c
 ## 🌲 The Index
 
 `index()` returns a character-exact tree — sections you can address and retrieve directly, each tagged with how its structure was found and whether it verified:
-
-```mermaid
-flowchart TD
-    root(["📄 attn.pdf · tier: outline · 0 LLM"])
-    root --> intro["Introduction · p2<br/>✓ verified"]
-    root --> model["Model Architecture · p2–5<br/>✓ verified"]
-    model --> attn["Attention · p3–5<br/>✓ verified"]
-    classDef v fill:#e7f4ee,stroke:#0b7a53,color:#0b3d2a;
-    class intro,model,attn v
-```
-
-...and the same tree as data:
 
 ```json
 {
