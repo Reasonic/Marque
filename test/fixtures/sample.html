@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Vectorless RAG</title>
+  <style>.hidden { display: none; }</style>
+  <script>var h = "<h2>not a real heading</h2>";</script>
+</head>
+<body>
+  <p>Structure-first document indexing without a vector&nbsp;database.</p>
+  <h1>Vectorless RAG</h1>
+  <h2>Background</h2>
+  <p>Embeddings &amp; vector stores add cost to retrieval.</p>
+  <h3>Prior Work</h3>
+  <p>PageIndex reconstructs a document&rsquo;s structure with hundreds of LLM calls,
+     reading none of the structure the file already contains.</p>
+  <h2>Approach</h2>
+  <p>We read the embedded outline first, then <a href="#t">typography</a>, then an
+     LLM only for what is genuinely ambiguous.</p>
+  <h2>Conclusion</h2>
+  <p>Documents already carry their structure; reading it is exact and free.</p>
+</body>
+</html>

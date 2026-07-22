@@ -35,6 +35,23 @@ Every section is then verified locally by token-set coverage against its claimed
 start page. A mismatch is recorded as **unverified**, never as **wrong** — see
 [Verification](#verification) for why that distinction matters.
 
+### Formats
+
+Extraction is dispatched by file type; everything below it — tiers, verification,
+retrieval — is format-agnostic.
+
+| Format | Structure source | Tier |
+|---|---|---|
+| **PDF** (`.pdf`) | embedded outline, else typography, else LLM | 1–3 |
+| **Markdown** (`.md`) | `#` headings | **1** — exact, $0 |
+| **HTML** (`.html`) | `<h1>`–`<h6>` | **1** — exact, $0 |
+
+PDF is the hard case: structure is hidden in an outline or in typography.
+Structured-text formats *state* it, so they resolve at tier 1 exactly — no LLM, no
+verification failures. `npm run bench:non-pdf` indexes the repo's own docs: **46/46
+sections verified, 0 LLM calls, $0**. DOCX/EPUB slot in as more extractors behind
+the same dispatcher.
+
 ## Status
 
 Implemented: tiers 1–3, local verification, and retrieval (BM25 prefilter →
