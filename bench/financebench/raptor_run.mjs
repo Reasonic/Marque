@@ -26,7 +26,7 @@ const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i !== -
 const N = Number(arg('questions', 0)) || 0;
 const BUDGET = Number(arg('budget', 45));
 const CONCURRENCY = Number(arg('concurrency', 5));
-const OUT = new URL('./results-raptor.json', import.meta.url).pathname;
+const OUT = new URL(`./${arg('out', 'results-raptor.json')}`, import.meta.url).pathname;
 const PY = new URL('./raptor-venv/bin/python', import.meta.url).pathname;
 const BRIDGE = new URL('./raptor_bridge.py', import.meta.url).pathname;
 const MAX_CHARS = 900_000; // ~250k tokens, matching the baseline's doc cap

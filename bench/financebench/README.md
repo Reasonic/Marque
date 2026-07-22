@@ -217,6 +217,20 @@ Two conclusions follow, and both are more careful than "structure-first loses":
 
 Reproduce: `node bench/financebench/significance.mjs`.
 
+**Run-to-run stability.** McNemar covers sampling over questions; a separate source
+of noise is LLM stochasticity from one full run to the next. Three independent runs
+of each embedding-free-comparable system ([`variance.mjs`](variance.mjs)):
+
+| system | runs | mean | SD | range |
+|---|---|---|---|---|
+| ours (expansion) | 36.0 / 36.7 / 34.0% | 35.6% | 1.4 pts | [34.0%, 36.7%] |
+| RAPTOR           | 36.0 / 32.7 / 34.0% | 34.2% | 1.7 pts | [32.7%, 36.0%] |
+
+Both are stable (SD ≈ 1.5 pts) — the single-run headlines are not lucky draws — and
+the two ranges overlap almost entirely, so the ours/RAPTOR parity holds run-to-run,
+not just in one draw. (The baseline was not re-run: its per-chunk contextualization
+makes repeats costly, and McNemar already settled that comparison.)
+
 This is the boundary the benchmark exists to draw. The library's claim is that you do
 not need a vector database to *navigate* a structured document, and the
 structure-extraction numbers elsewhere in this repo hold. FinanceBench tests a harder
