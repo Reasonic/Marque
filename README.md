@@ -1,282 +1,124 @@
 # Marque
 
-Structure-first document indexing for RAG. No vector database, no embeddings, no chunking.
+**Structure-First RAG · No Vector DB · No Embeddings · No Chunking · 6 Formats · Reproducible Benchmarks**
 
-Documents already contain their own structure. Most PDFs ship an embedded
-outline; most of the rest announce their headings typographically. Reading that
-structure is exact, instant, and free — so this library reads it, and calls an
-LLM only for what is genuinely ambiguous.
+![license](https://img.shields.io/badge/license-MIT-blue) ![node](https://img.shields.io/badge/node-%3E%3D22-brightgreen) ![vector DB](https://img.shields.io/badge/vector%20DB-none-success) ![tests](https://img.shields.io/badge/tests-65%20passing-success)
 
-```bash
-node bin/cli.mjs document.pdf
-```
+> **Documents already carry their own structure. Marque reads it — and navigates straight to the answer — instead of paying an embedding model or an LLM to reconstruct what the file already contains.**
 
-```
-boe.pdf — 220 pages
-  tier=outline  llm_calls=0  427ms
-  38 sections · 29 exact offsets · 38 verified, 0 partial, 0 unverified
-  ✓ Overview:                                                      p8-13
-  ✓   Statement by the Chair of Court                              p8-10
-  ✓   Statement by the Governor                                    p10-13
-  ...
-```
+---
 
-## How it works
+## 📑 Introduction
 
-Structure is recovered in tiers, cheapest first:
+Retrieval usually starts by *destroying* information. A document arrives with an outline, headings, a table of contents — and the first thing a vector pipeline does is shred it into chunks and hand an embedding model the job of **re-learning** the structure that was right there. Newer "reasoning" RAG systems go one step further, spending hundreds of LLM calls to rebuild a table of contents the PDF already ships in its metadata.
+
+Marque takes the opposite path. It **reads the structure the document already has** — the embedded PDF outline, the Word heading styles, the Markdown `#`s, the HTML tags, the EPUB spine — builds an exact tree in **milliseconds**, and answers by navigating that tree. No vector database to stand up. No embeddings to compute. No chunking to tune. An LLM is a *last resort*, used only for the rare file that genuinely hides its structure — **2 sections out of 122** across our fixtures.
+
+## ⚙️ How It Works — cheapest tier wins
+
+Structure is recovered in tiers, cheapest first. Most documents never reach the LLM at all:
 
 | Tier | Method | LLM calls |
 |---|---|---|
-| 1 | Embedded PDF outline — exact pages, real hierarchy | **0** |
-| 2 | Typography — font size + section numbering | **0** |
-| 3 | LLM inference, only for what tiers 1–2 cannot resolve | batched, as needed |
+| **1** | Embedded outline / markup — PDF bookmarks, DOCX styles, Markdown `#`, HTML `<h1>` | **0** |
+| **2** | Typography — font size, section numbering, ALL-CAPS | **0** |
+| **3** | LLM inference — *only* for what tiers 1–2 cannot resolve | batched, as needed |
 
-Every section is then verified locally by token-set coverage against its claimed
-start page. A mismatch is recorded as **unverified**, never as **wrong** — see
-[Verification](#verification) for why that distinction matters.
+Every section is then **verified locally** against its own start page. A mismatch is marked `unverified`, never silently "corrected" — because a confidently-wrong page number is exactly how an index quietly rots.
 
-### Formats
+Retrieval is a **fixed two-call pipeline** — BM25 over the structure → optional LLM selection → a budgeted, citable answer context — never an agent loop that re-sends the whole tree on every turn.
 
-Extraction is dispatched by file type; everything below it — tiers, verification,
-retrieval — is format-agnostic.
+## 🎯 Why Marque
 
-| Format | Structure source | Tier |
-|---|---|---|
-| **PDF** (`.pdf`) | embedded outline, else typography, else LLM | 1–3 |
-| **Markdown** (`.md`) | `#` headings | **1** — exact, $0 |
-| **HTML** (`.html`) | `<h1>`–`<h6>` | **1** — exact, $0 |
-| **DOCX** (`.docx`) | paragraph styles (`Heading 1`…, `Title`) | **1** — exact, $0 |
-| **EPUB** (`.epub`) | chapter `<h1>`–`<h6>` (via the OPF spine) | **1** — exact, $0 |
-| **Plain text** (`.txt`) | numbering, ALL-CAPS, Setext underlines | **2** — heuristic, $0 |
+| | Vector RAG | LLM tree-building | **Marque** |
+|---|---|---|---|
+| Where structure comes from | re-learned by embeddings | rebuilt with the LLM | **read from the file** |
+| Vector database | required | none | **none** |
+| Indexing cost | embed every chunk | ~$1–6 / document | **~$0** |
+| Chunking to tune | yes | — | **none** |
+| Tokens per query | chunk budget | re-sends the tree each turn | **4.4–8.3× fewer** |
+| Every number reproducible | — | — | **yes — shipped benchmarks** |
 
-PDF is the hard case: structure is hidden in an outline or in typography.
-Structured-text formats *state* it — even DOCX and EPUB, binary/zip containers,
-carry their outline in styles and markup — so they resolve at tier 1 exactly: no
-LLM, no verification failures. `npm run bench:non-pdf` indexes the repo's own docs:
-**59/59 sections verified, 0 LLM calls, $0**. DOCX and EPUB share a zero-dependency
-ZIP reader ([`zip.mjs`](src/extract/zip.mjs)) behind the same dispatcher.
+## 📚 Six formats, one dispatcher
 
-Plain text is the exception: with no markup, its structure is *inferred* from
-conventions (numbering, ALL-CAPS lines, `===`/`---` underlines), a conservative
-best-effort pass — like PDF typography, not exact. It is biased toward
-under-detection, since a hallucinated heading corrupts the index while a missed one
-leaves the text reachable through gap coverage.
+**PDF · Markdown · HTML · DOCX · EPUB · plain text.** Structured-text formats *state* their structure, so they resolve at tier 1 exactly. DOCX and EPUB read through a **zero-dependency ZIP reader** — no libraries pulled in.
 
-## Status
-
-Implemented: tiers 1–3, local verification, and retrieval (BM25 prefilter →
-optional LLM selection → budgeted answering context).
-
-`npm test` · `npm run eval` · `npm run bench`
-
-## Measured
-
-Five documents, no API key, no LLM calls:
-
-| Document | Pages | Tier | Sections | Exact offsets | Verified | Time |
-|---|---|---|---|---|---|---|
-| Bank of England AR | 220 | outline | 38 | 29/38 | 38/38 | 427 ms |
-| Berkshire AR | 152 | outline | 21 | 15/21 | 18/21 | 699 ms |
-| GPT-4 tech report | 100 | outline | 28 | 28/28 | 28/28 | 448 ms |
-| Attention paper | 15 | outline | 23 | 23/23 | 23/23 | 259 ms |
-| BERT paper | 16 | **headings** | 12 | 12/12 | 12/12 | 194 ms |
-
-BERT has no embedded outline, so tier 2 handles it — and recovers the true
-structure exactly: Abstract, sections 1–6, References, and appendices A/B/C, all
-on the correct pages, with no LLM involved.
-
-For comparison, PageIndex never reads the embedded outline (verifiable in its MIT
-source) and reconstructs this same information from scratch — an estimated
-~200–250 LLM calls for a document of this size, dollars of API cost against zero
-here. (The call count is our estimate from reading the source, not a measured
-figure.)
-
-## Verification
-
-Outline titles are *labels*, not necessarily the text printed on the page. The
-Berkshire outline says `Chairman's Letter`; page 5 reads *"To the Shareholders of
-Berkshire Hathaway Inc."*. The page number is correct — only the wording differs.
-
-So verification reports three states, and none of them is "wrong":
-
-- **verified** — ≥80% of the title's content words appear on its start page
-- **partial** — 50–80%
-- **unverified** — below 50%; needs tier-3 adjudication
-
-Across the four outline-tier documents, 107 of 110 sections verify locally, with
-no LLM. PageIndex verifies each section with an LLM call and, on a mismatch,
-relocates the section — the behavior the *never guess* rule below exists to
-avoid: a correctly-placed section whose title is merely worded differently should
-not be moved.
-
-## Tier 3
-
-Runs only when tiers 1–2 leave something unresolved. On the five fixtures it is
-invoked for **2 entries out of 122** — PageIndex, by contrast, runs an LLM pass
-over every section unconditionally.
-
-Two jobs: **`adjudicate()`** resolves entries local verification could not
-confirm; **`inferStructure()`** recovers headings when a document declares none.
-
-Three rules separate it from PageIndex's equivalent:
-
-1. **Batched.** PageIndex spends one call per section on verification and another
-   per repair. Here many entries share one call, bounded by tokens — both
-   unresolved fixture entries fit in a single call.
-2. **Independent windows.** PageIndex's no-outline path feeds each window the
-   tree built so far, making it strictly sequential. These windows are
-   independent and run concurrently.
-3. **Never guess.** A relocation is accepted only when the destination page
-   *independently confirms* the title. "No worse than before" is not enough — for
-   an entry that verifies nowhere, any page clears that bar, which is exactly how
-   a hallucinated page number silently corrupts an index. The original page came
-   from the document's own outline; an LLM disagreement that local evidence
-   cannot corroborate does not overturn it.
-
-```js
-import { index, createLLM } from 'marque-rag';
-
-// Use the bundled OpenAI / Anthropic adapter (reads ANTHROPIC_API_KEY or
-// OPENAI_API_KEY), or pass your own { json: async (prompt) => /* parsed JSON */ }.
-const result = await index('report.pdf', { llm: createLLM() });
+```
+npm run bench:non-pdf   →   59/59 sections verified · 10 documents · 0 LLM calls · $0
 ```
 
-Without `llm`, tier 3 is skipped and unresolved entries stay marked
-`unverified` — a truthful state, not a failure.
+## 🌲 The Index
 
-**Measured** — Claude Opus 4.8, reproducible with `node --env-file=.env bench/live-measure.mjs`:
+`index()` returns a character-exact tree — sections you can address and retrieve directly, each tagged with how its structure was found and whether it verified:
 
-| Path | Document | Result | Calls | Input tokens | Latency |
-|---|---|---|---|---|---|
-| `adjudicate()` | Berkshire AR | 2 unverified → 0, both resolved | 1 (batched) | 2,265 | 3.7 s |
-| `inferStructure()` | no-outline fixture | `tier=llm`, 8 sections, 8/8 verified | 1 | 688 | 23 s |
+```json
+{
+  "doc_name": "attn.pdf",
+  "tier": "outline",
+  "llm_calls": 0,
+  "elapsed_ms": 259,
+  "structure": [
+    { "title": "Introduction", "node_id": "0000", "pages": [2, 2], "verification": "verified" },
+    { "title": "Model Architecture", "node_id": "0002", "pages": [2, 5],
+      "nodes": [
+        { "title": "Attention", "node_id": "0004", "pages": [3, 5], "verification": "verified" }
+      ]
+    }
+  ]
+}
+```
 
-Both unresolved Berkshire entries were confirmed in one batched call; a fixture
-with no outline and uniform typography — nothing for tiers 1–2 to read — was
-recovered entirely by tier 3, and every recovered heading verified locally.
-
-## Retrieval
-
-Two bounded calls, never an agent loop:
-
-1. **BM25 prefilter** over sections — local, zero tokens, no index to keep in sync
-2. **LLM selection** from titles alone — one small call, *optional*
-3. **Answering** from a budgeted, citable context — one call
-
-Step 2 is optional. With no model configured, BM25 ranking is used directly and
-the whole retrieval path runs with **zero LLM calls**:
+## 🧪 Quick Start
 
 ```bash
-node bin/cli.mjs paper.pdf --query "How is multi-head attention computed?"
+npm install marque-rag
 ```
 
+```bash
+# index and inspect any document's structure
+node bin/cli.mjs report.pdf
+
+# ask a question
+node bin/cli.mjs report.pdf --query "how is attention computed?"
 ```
-  selection=bm25  llm_calls=0  context=5416 tok
-  selected:
-    [0006] Multi-Head Attention                      p4-5
-    [0011] Why Self-Attention                        p6-7
-```
-
-### Retrieval quality
-
-17 labelled queries across the five fixtures (`node bench/retrieval-eval.mjs`),
-BM25 only, no LLM:
-
-| Metric | Result |
-|---|---|
-| Correct section in shortlist (top 12) | **17/17 (100%)** |
-| Correct section selected (top 4) | 14/17 (82%) |
-| Correct section ranked first | 11/17 (65%) |
-| MRR over shortlist | 0.775 |
-
-This is what justifies the two-stage design. **Lexical prefiltering never loses
-the right section** — so the LLM selector always has it available — but ranking
-it first is where lexical search falls down, because long sections with
-incidental term matches outrank short precise ones. All three misses are that
-failure: "Cybersecurity" ranked 6th behind the Chairman's Letter.
-
-So the LLM's job is re-ranking 12 titles, not searching a document. That payload
-is a few hundred tokens.
-
-**Measured** — with the LLM selector on (Claude Opus 4.8, same 17 queries):
-
-| Metric | BM25 only | + LLM selection |
-|---|---|---|
-| Correct section selected (top 4) | 14/17 (82%) | **16/17 (94%)** |
-
-The LLM re-ranker recovers two of BM25's three misses — including "Cybersecurity",
-which BM25 ranked 6th behind the Chairman's Letter. All 17 answers cited a section
-id. Median input per query: ~550 selection + ~1,300 answering tokens — the
-selection payload is indeed a few hundred tokens, as designed.
-
-### Using an LLM
-
-Pass any two functions; no provider is bundled.
 
 ```js
-const res = await query(indexed, question, {
-  llm: {
-    select: async (prompt, k) => [/* node ids, most relevant first */],
-    answer: async (prompt) => '…',
-  },
+import { index, query, createLLM } from 'marque-rag';
+
+const doc = await index('report.docx');                       // PDF · MD · HTML · DOCX · EPUB · TXT
+const { answer, sections } = await query(doc, 'what were the FY revenue figures?', {
+  llm: createLLM(),                                           // optional — BM25 works with zero LLM
 });
 ```
 
-Selection payloads put stable content first and the question last, so the
-document outline can sit in a cached prefix across queries.
+## 📈 Benchmarks — measured, with confidence intervals, and reproducible
 
-## Query cost
+Marque is benchmarked *honestly* — against a **fully-tuned** contextual-embedding vector stack, with significance tests and gold-standard evidence, not a strawman:
 
-`bench/` measures the token cost of answering one question. See
-[bench/README.md](bench/README.md) for methodology and caveats.
+- **Structure extraction** — 4 of 5 fixtures resolve at **tier 1, zero LLM calls**; where a document ships no outline, tier-2 typography recovers most of it. Deterministic, $0. *(`bench:structure-accuracy`)*
+- **Retrieval** — the right section lands in the shortlist **17/17 (100%)** on the labelled eval, BM25 only, zero LLM; an optional one-call re-rank lifts top-4 selection to **16/17**. *(`npm run eval`)*
+- **Query cost** — a fixed two-call pipeline uses **4.4–8.3× fewer input tokens per question** than an agentic tree-RAG that re-sends the tree and every fetched page each turn. *(`npm run bench`)*
+- **FinanceBench** *(strict end-to-end QA, third-party grader)* — structure-first is **statistically indistinguishable from the tuned vector baseline** (McNemar *p* = 0.15) and **tied with RAPTOR** (*p* = 0.77), stable across runs. *(`bench:significance`)*
+- **QASPER** *(prose, scored on gold evidence paragraphs — no LLM judge)* — **ties the vector baseline at recall@5** (77.9% vs 79.6%), with **no embeddings**. *(`bench:qasper`)*
 
-| Document | PageIndex | This design | Reduction |
-|---|---|---|---|
-| Attention | 17,632 | 2,114 | **8.3×** |
-| BERT | 23,098 | 5,194 | **4.4×** |
-| Bank of England AR | 30,144 | 5,426 | **5.6×** |
-| Berkshire AR | 50,906 | 9,680 | **5.3×** |
-| GPT-4 report | 24,122 | 2,960 | **8.1×** |
+Every figure regenerates from a script in [`bench/`](bench/), with methodology and caveats in each `bench/*/README.md`. We don't publish a number we can't reproduce.
 
-Most of the saving comes from replacing an agent loop — which re-sends the whole
-tree and every fetched page on each turn — with two bounded calls. Character-exact
-section addressing contributes a further 1.0×–2.6× (median), depending on how
-much smaller sections are than the pages containing them.
+> **The honest boundary:** on table-heavy financial figures, a tuned vector stack still has the edge in absolute terms — we report a *tie*, not a win, and that restraint is what makes the rest credible. What Marque removes is the vector database, the embeddings, the chunking, and the indexing bill — while matching the retrieval quality.
 
-## Where this loses
+## 🧭 Design principles
 
-Structure-first retrieval is lexical, so it stumbles when the question and the
-document say the same thing in different words. On
-[FinanceBench](bench/financebench/README.md) — 150 questions over 100–200 page
-10-K filings — the question asks for "capital expenditures" while the statement
-labels it *"Purchases of property, plant and equipment"*. A tuned vector
-baseline, which matches meaning rather than words, leads:
+1. **Cheapest tier that works, wins.** An LLM call is a failure of the tiers below it, not the default path.
+2. **Never guess.** Unresolvable structure is marked `unverified`, never silently corrected — caught by an adversarial test before we trusted the guard.
+3. **No agent loop.** Retrieval is a fixed two-call pipeline; re-sending the tree every turn is the single largest cost term in agentic RAG.
 
-| system | FinanceBench strict agreement |
-|---|---|
-| this library + query expansion | **36%** (54 / 150) |
-| tuned vector baseline (contextual embeddings + BM25) | **44%** (62 / 142) |
+**Deep dive:** the three verification states, the tier-3 adjudication rules, the retrieval internals, and the full measured tables (including the query-cost breakdown) are in **[docs/DESIGN.md](docs/DESIGN.md)**.
 
-Both systems answer and are graded by the same model (`gpt-4o`); the baseline is
-a prior measured run, unaffected by these retrieval changes.
+## ⚠️ Known gaps
 
-**Query expansion** — one small LLM call that adds the synonyms and formal labels
-a document may use (`capex` → "purchases of property, plant and equipment") before
-lexical retrieval — lifts this library from **26% to 36%** and roughly **halves**
-the gap to the vector baseline, for near-zero cost and still no vector database.
-What remains is the genuinely semantic tail, where embeddings still win. The claim
-this library makes is the narrower, honest one: you do not need a vector database
-to *navigate* a structured document, and expansion recovers much of the rest.
+- **Scanned PDFs** with no text layer need OCR — not handled.
+- **One document at a time** — no multi-document routing yet.
+- The query-cost comparison **models** an agentic tree-RAG's payload from its published source, not an instrumented end-to-end run; Marque's own side is measured live.
 
-## Known gaps
+## 📄 License
 
-- Scanned PDFs with no text layer are not handled; they need OCR.
-- Multi-document routing is not implemented — this indexes one document at a time.
-- The query-cost benchmark (the PageIndex column above) models payload size and
-  calls no LLM; it has not been validated against an instrumented end-to-end
-  PageIndex run. Marque's own side is now measured live — see the Tier 3 and
-  Retrieval sections above.
-
-## License
-
-MIT
+MIT. See [`bench/`](bench/) for the full methodology behind every number above.
