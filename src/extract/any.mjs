@@ -10,12 +10,14 @@
 import { extract as extractPdf } from './pdf.mjs';
 import { extractMarkdown } from './markdown.mjs';
 import { extractHtml } from './html.mjs';
+import { extractDocx } from './docx.mjs';
 
 const extractorFor = {
   md: extractMarkdown,
   markdown: extractMarkdown,
   html: extractHtml,
   htm: extractHtml,
+  docx: extractDocx,
 };
 
 export async function extract(path, opts) {

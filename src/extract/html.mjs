@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { docFromSections, foldPreamble } from './flow.mjs';
 
 /**
  * HTML extraction. Structure is explicit in the markup — `<h1>`–`<h6>` are the
@@ -43,26 +44,6 @@ export async function extractHtml(path) {
   }
 
   const sections = segments.map((s) => ({ depth: s.depth, title: s.title, body: stripTags(s.body) }));
-
-  // Content before the first heading (a lead paragraph) belongs to the first
-  // section, not a phantom section of its own; with no headings at all it becomes
-  // the sole section, titled by the document <title>.
-  const pre = stripTags(preamble);
-  if (pre.length > 40) {
-    if (sections.length) sections[0].body = `${pre}\n${sections[0].body}`;
-    else sections.push({ depth: 0, title: docTitle, body: pre });
-  }
-
-  let fullText = '';
-  const pages = [];
-  const outline = [];
-  sections.forEach((s, i) => {
-    const offset = fullText.length;
-    const body = `${s.title}\n${s.body}\n`;
-    fullText += body;
-    pages.push({ page: i + 1, offset, text: body });
-    outline.push({ title: s.title, depth: s.depth, page: i + 1 });
-  });
-
-  return { name: path.split('/').pop(), numPages: pages.length, pages, lines: [], fullText, outline };
+  foldPreamble(sections, stripTags(preamble), docTitle);
+  return docFromSections(path.split('/').pop(), sections);
 }
