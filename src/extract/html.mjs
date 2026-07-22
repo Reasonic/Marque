@@ -24,12 +24,16 @@ const decode = (s) => s
 const stripTags = (s) => decode(s.replace(/<[^>]+>/g, ' '))
   .replace(/[^\S\n]+/g, ' ').replace(/ *\n */g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 
-export async function extractHtml(path) {
-  const html = fs.readFileSync(path, 'utf8')
+/**
+ * Parse an HTML/XHTML string into `{title, depth, body}` sections. Exposed so the
+ * EPUB extractor — whose chapters are XHTML inside a ZIP — reuses it unchanged.
+ * `fallbackTitle` names the lead section when the markup has no <title>.
+ */
+export function htmlToSections(raw, fallbackTitle = 'Document') {
+  const html = raw
     .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, ' ');
-
-  const docTitle = stripTags(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] || '') || path.split('/').pop();
+  const docTitle = stripTags(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] || '') || fallbackTitle;
 
   // Split on heading tags, keeping them (capturing group), then fold each body
   // into the heading that precedes it.
@@ -44,6 +48,10 @@ export async function extractHtml(path) {
   }
 
   const sections = segments.map((s) => ({ depth: s.depth, title: s.title, body: stripTags(s.body) }));
-  foldPreamble(sections, stripTags(preamble), docTitle);
-  return docFromSections(path.split('/').pop(), sections);
+  return foldPreamble(sections, stripTags(preamble), docTitle);
+}
+
+export async function extractHtml(path) {
+  const name = path.split('/').pop();
+  return docFromSections(name, htmlToSections(fs.readFileSync(path, 'utf8'), name));
 }

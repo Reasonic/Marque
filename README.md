@@ -46,13 +46,14 @@ retrieval — is format-agnostic.
 | **Markdown** (`.md`) | `#` headings | **1** — exact, $0 |
 | **HTML** (`.html`) | `<h1>`–`<h6>` | **1** — exact, $0 |
 | **DOCX** (`.docx`) | paragraph styles (`Heading 1`…, `Title`) | **1** — exact, $0 |
+| **EPUB** (`.epub`) | chapter `<h1>`–`<h6>` (via the OPF spine) | **1** — exact, $0 |
 
 PDF is the hard case: structure is hidden in an outline or in typography.
-Structured-text formats *state* it — even DOCX, a binary Office format, carries its
-outline in paragraph styles — so they resolve at tier 1 exactly: no LLM, no
-verification failures. `npm run bench:non-pdf` indexes the repo's own docs: **51/51
-sections verified, 0 LLM calls, $0**. DOCX and EPUB share a zero-dependency ZIP
-reader ([`zip.mjs`](src/extract/zip.mjs)); EPUB slots in behind the same dispatcher.
+Structured-text formats *state* it — even DOCX and EPUB, binary/zip containers,
+carry their outline in styles and markup — so they resolve at tier 1 exactly: no
+LLM, no verification failures. `npm run bench:non-pdf` indexes the repo's own docs:
+**54/54 sections verified, 0 LLM calls, $0**. DOCX and EPUB share a zero-dependency
+ZIP reader ([`zip.mjs`](src/extract/zip.mjs)) behind the same dispatcher.
 
 ## Status
 
