@@ -17,3 +17,8 @@ types/
 bench/financebench/data/
 bench/financebench/pdfs/
 bench/financebench/results*.json
+
+# RAPTOR head-to-head (working dirs + outputs, never committed)
+bench/financebench/raptor/
+bench/financebench/raptor-venv/
+bench/financebench/results-raptor*.json

@@ -137,6 +137,52 @@ questions the baseline gets wrong — and the honest boundary is now the narrowe
 you do not need a vector database to *navigate* a structured document, and expansion
 recovers much of the harder retrieval too.
 
+### A second reference point: RAPTOR
+
+The vector baseline is the *ceiling* here; RAPTOR is the closest *peer*. It is a
+well-cited tree/summary RAG (Sarthi et al., ICLR 2024) that, like us, imposes
+structure on a document — but *with* embeddings: it recursively clusters and
+LLM-summarizes chunks into a tree, then retrieves across the summary layers.
+Running it head-to-head answers the fair question — does the tree buy anything our
+structure-first pass doesn't, once you also pay for a vector index?
+
+We run the real repo — [`raptor_bridge.py`](raptor_bridge.py) drives
+`github.com/parthsarthi03/raptor` as a **retrieval system only**, with the same
+`gpt-4o` answerer and the same grader, so (exactly as with the baseline) retrieval
+is the only variable. RAPTOR's config is stated for the record:
+`text-embedding-3-small` (the same embeddings as the baseline), `gpt-4o-mini` for
+cluster summaries (RAPTOR uses a cheap summariser by design), 300-token leaf chunks,
+top-8 retrieval.
+
+On the **142 questions all three systems answered**:
+
+| system | strict agreement | vector index? |
+|---|---|---|
+| baseline (contextual)                 | **43.7%** (62/142) | yes |
+| **ours** (structure-first + expansion) | **35.9%** (51/142) | **no** |
+| RAPTOR (tree/summary)                 | **34.5%** (49/142) | yes |
+
+**Read this as parity, not a win.** Ours is nominally ahead of RAPTOR — but 51 vs 49
+is a two-question margin on a single, non-deterministic run, which is noise. The
+result that matters is the *tie*: structure-first retrieval matches a tree-RAG that
+embeds every chunk and summarizes it recursively, while using **no embeddings and no
+vector store** — and it does so at **$3.02** of metered cost for the whole
+150-question run, roughly a hundredth of an equivalent PageIndex run. Both peers still
+trail the tuned vector baseline; the tables are where embeddings keep their edge.
+
+Caveats specific to this run:
+- Single run, ~2-question margin → **parity, not superiority**. Re-running moves it.
+- One RAPTOR build failed — `CVSHEALTH_2022_10K`, whose Gaussian-mixture clustering
+  raised *"ill-defined empirical covariance"*; its questions got no context and are
+  counted against RAPTOR — a real, if narrow, robustness gap, not a scoring artefact.
+- The RAPTOR config above is one reasonable choice; a differently tuned tree could
+  score differently. It is pinned in the bridge so the run is reproducible.
+
+Reproduce (RAPTOR repo + venv are fetched locally, never committed):
+```bash
+node --env-file=.env bench/financebench/raptor_run.mjs --budget 40
+```
+
 This is the boundary the benchmark exists to draw. The library's claim is that you do
 not need a vector database to *navigate* a structured document, and the
 structure-extraction numbers elsewhere in this repo hold. FinanceBench tests a harder
