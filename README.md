@@ -16,7 +16,23 @@ Marque takes the opposite path. It **reads the structure the document already ha
 
 ## ⚙️ How It Works — cheapest tier wins
 
-Structure is recovered in tiers, cheapest first. Most documents never reach the LLM at all:
+Structure is recovered in tiers, cheapest first. A document exits at the first tier that can read it — and most never reach the LLM:
+
+```mermaid
+flowchart TD
+    D(["📄 Any document"]) --> T1{"Tier 1<br/>ships an outline<br/>or markup?"}
+    T1 -->|"yes · 4 of 5 fixtures"| F1["✓ exact tree<br/>0 LLM · $0"]
+    T1 -->|no| T2{"Tier 2<br/>headings by<br/>typography?"}
+    T2 -->|yes| F2["✓ recovered tree<br/>0 LLM · $0"]
+    T2 -->|"no · rare"| T3["Tier 3<br/>LLM inference<br/>2 of 122 sections"]
+    T3 --> F3["✓ inferred tree<br/>batched LLM"]
+    classDef free fill:#e7f4ee,stroke:#0b7a53,stroke-width:1.5px,color:#0b3d2a;
+    classDef llm fill:#edecfb,stroke:#4338ca,stroke-width:1.5px,color:#2a2470;
+    class F1,F2 free
+    class T3,F3 llm
+```
+
+The three tiers:
 
 | Tier | Method | LLM calls |
 |---|---|---|
