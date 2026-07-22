@@ -14,6 +14,7 @@
     "test": "node --test 'test/*.test.mjs'",
     "test:live": "node --test 'test/live/*.test.mjs'",
     "bench": "node bench/query-cost.mjs bench/fixtures/*.pdf",
+    "bench:structure-cost": "node bench/structure-cost.mjs",
     "bench:all": "node bench/all.mjs",
     "eval": "node bench/retrieval-eval.mjs",
     "fixtures": "./bench/fetch-fixtures.sh",
