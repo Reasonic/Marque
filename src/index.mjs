@@ -103,4 +103,5 @@ export async function index(path, opts = {}) {
 export { extract } from './extract/any.mjs';
 export { sectionText } from './structure/sections.mjs';
 export { query } from './retrieve/query.mjs';
+export { indexCorpus, queryCorpus } from './corpus.mjs';
 export { createLLM } from './llm/index.mjs';

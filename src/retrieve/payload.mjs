@@ -119,8 +119,14 @@ export function windowAround(text, question, maxTokens, passageTokens = 800) {
  * stay citable. A section too large to include whole contributes the passage
  * where the question's terms cluster (windowAround), not its head — so a figure
  * deep inside a coarse section still reaches the answerer.
+ *
+ * Single-document by default: text comes from `doc.fullText`. For a corpus, where
+ * each node belongs to a different document, pass `getText(node)` to resolve a
+ * node's own text (and give nodes a `gid`/`doc` so the citation names the file);
+ * `doc` is then unused and may be null.
  */
-export function assembleContext(doc, nodes, { budget = 6000, query = '' } = {}) {
+export function assembleContext(doc, nodes, { budget = 6000, query = '', getText } = {}) {
+  const resolve = getText || ((n) => doc.fullText.slice(n.char_start, n.char_end));
   const blocks = [];
   let used = 0;
   let truncated = 0;
@@ -129,8 +135,10 @@ export function assembleContext(doc, nodes, { budget = 6000, query = '' } = {}) 
     const remaining = budget - used;
     if (remaining < 200) break;
     const loc = node.start_index != null ? ` (p${node.start_index}-${node.end_index})` : '';
-    const header = `[${node.node_id}] ${node.title}${loc}\n`;
-    const full = doc.fullText.slice(node.char_start, node.char_end).replace(/\n{3,}/g, '\n\n').trim();
+    const id = node.gid || node.node_id;
+    const label = node.doc ? `${node.doc} — ${node.title}` : node.title;
+    const header = `[${id}] ${label}${loc}\n`;
+    const full = resolve(node).replace(/\n{3,}/g, '\n\n').trim();
 
     let body = full;
     if (countTokens(header + full) > remaining) {

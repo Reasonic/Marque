@@ -1,16 +1,18 @@
 #!/usr/bin/env node
-import { index, query, createLLM } from '../src/index.mjs';
+import { index, query, indexCorpus, queryCorpus, createLLM } from '../src/index.mjs';
 
 const args = process.argv.slice(2);
 const json = args.includes('--json');
 const useLlm = args.includes('--llm');
+const useCorpus = args.includes('--corpus');
 const qFlag = args.indexOf('--query');
 const question = qFlag !== -1 ? args[qFlag + 1] : null;
 const files = args.filter((a, i) => !a.startsWith('--') && !(qFlag !== -1 && i === qFlag + 1));
 
 if (!files.length) {
-  console.error('usage: marque <file.pdf ...> [--json] [--query "question"] [--llm]');
-  console.error('  --llm  enable tier 3 and LLM retrieval via ANTHROPIC_API_KEY / OPENAI_API_KEY');
+  console.error('usage: marque <file ...> [--json] [--query "question"] [--llm] [--corpus]');
+  console.error('  --llm     enable tier 3 and LLM retrieval via ANTHROPIC_API_KEY / OPENAI_API_KEY');
+  console.error('  --corpus  with several files + --query: route the question across them (which file, then where)');
   process.exit(1);
 }
 
@@ -23,6 +25,27 @@ if (useLlm) {
     console.error(err.message);
     process.exit(1);
   }
+}
+
+// Corpus mode: route one question across several documents — which file, then
+// where inside it — instead of querying each file independently.
+if (question && useCorpus) {
+  const corpus = await indexCorpus(files, { llm });
+  const res = await queryCorpus(corpus, question, { llm });
+  if (json) {
+    console.log(JSON.stringify({ ...res, context: undefined }, null, 2));
+  } else {
+    console.log(`\ncorpus (${corpus.documents.length} documents) — "${question}"`);
+    console.log(`  routed → ${res.routed_documents.join(', ')}`);
+    console.log(`  selection=${res.selection_by}  llm_calls=${res.tokens.llm_calls}  context=${res.tokens.context} tok`);
+    console.log('  selected:');
+    for (const s of res.sections) {
+      const pages = s.pages[0] == null ? '' : ` p${s.pages[0]}-${s.pages[1]}`;
+      console.log(`    [${s.doc}##${s.node_id}] ${s.title.slice(0, 50).padEnd(52)}${pages}`);
+    }
+    if (res.answer) console.log(`\n  answer: ${res.answer}`);
+  }
+  process.exit(0);
 }
 
 const printTree = (nodes, depth = 0) => {

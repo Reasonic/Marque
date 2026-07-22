@@ -104,6 +104,32 @@ const { answer, sections } = await query(doc, 'what were the FY revenue figures?
 });
 ```
 
+## 🗂️ Multiple documents
+
+Point Marque at a *set* of files and it routes each question to the right one —
+**which file, then where inside it** — with no vector store and no per-document loop.
+Routing is BM25 over each document's identity (its name and section titles); an LLM,
+if configured, only refines the section pick and writes the answer.
+
+```js
+import { indexCorpus, queryCorpus, createLLM } from 'marque-rag';
+
+const corpus = await indexCorpus(['q1.pdf', 'q2.pdf', 'policy.docx', 'notes.md']);  // any mix of formats · 0 LLM
+const { answer, routed_documents, sections } = await queryCorpus(
+  corpus, 'what changed in the refund policy?', { llm: createLLM() },              // llm optional — BM25 routes with zero calls
+);
+// routed_documents → ['policy.docx', …]   ·   sections cite [policy.docx##0007]
+```
+
+```bash
+# from the CLI: route one question across several files
+node bin/cli.mjs q1.pdf q2.pdf policy.docx --corpus --query "what changed in the refund policy?"
+```
+
+Same two-call shape as single-document retrieval (route → select → answer), never an
+agent loop; with no LLM it is a complete, zero-token path. The honest weak spot is
+**near-duplicate files** — see **Known gaps** below.
+
 ## 📈 Benchmarks — measured, with confidence intervals, and reproducible
 
 Marque is benchmarked *honestly* — against a **fully-tuned** contextual-embedding vector stack, with significance tests and gold-standard evidence, not a strawman:
@@ -130,7 +156,7 @@ Every figure regenerates from a script in [`bench/`](bench/), with methodology a
 ## ⚠️ Known gaps
 
 - **Scanned PDFs** with no text layer need OCR — not handled.
-- **One document at a time** — no multi-document routing yet.
+- **Near-duplicate documents.** Multi-document routing (`indexCorpus` / `queryCorpus`) places a question in the right file by matching its identity — but two documents that differ only by a detail the question omits (the same annual report for two fiscal years) are ambiguous to route by lexical match. State the distinguishing detail in the question, or disambiguate upstream. *(The FinanceBench benchmark in [`bench/`](bench/financebench/README.md#head-to-head-vs-pageindex-the-987-claim) shows a domain-specific router that adds company + fiscal-year signals for exactly this case.)*
 - The query-cost comparison **models** an agentic tree-RAG's payload from its published source, not an instrumented end-to-end run; Marque's own side is measured live.
 
 ## 📄 License
