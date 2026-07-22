@@ -14,13 +14,13 @@ Retrieval usually starts by *destroying* information. A document arrives with an
 
 Marque takes the opposite path. It **reads the structure the document already has** — the embedded PDF outline, the Word heading styles, the Markdown `#`s, the HTML tags, the EPUB spine — builds an exact tree in **milliseconds**, and answers by navigating that tree. No vector database to stand up. No embeddings to compute. No chunking to tune. An LLM is a *last resort*, used only for the rare file that genuinely hides its structure — **2 sections out of 122** across our fixtures.
 
-<p align="center"><img src="assets/reconstruct-vs-read.png" width="560" alt="Everyone else reconstructs a document's structure — Vector RAG chunks and embeds, PageIndex rebuilds it with ~200 LLM calls, ML parsers OCR the pixels — while Marque reads the outline the file already ships: exact, $0."></p>
+<p align="center"><img src="assets/reconstruct-vs-read.png" width="600" alt="Everyone else reconstructs a document's structure — Vector RAG chunks and embeds, PageIndex rebuilds it with ~200 LLM calls, ML parsers OCR the pixels — while Marque reads the outline the file already ships: exact, $0."></p>
 
 ## ⚙️ How It Works — cheapest tier wins
 
 Structure is recovered in tiers, cheapest first. A document exits at the first tier that can read it — and most never reach the LLM:
 
-<p align="center"><img src="assets/tier-cascade.png" width="500" alt="Tier cascade: a document exits at the first tier that can read it — tier 1 embedded outline or markup (0 LLM, $0, where 4 of 5 fixtures land), tier 2 typography (0 LLM, $0), and tier 3 LLM inference only for the rare 2-of-122 sections."></p>
+<p align="center"><img src="assets/tier-cascade.png" width="560" alt="Tier cascade: a document exits at the first tier that can read it — tier 1 embedded outline or markup (0 LLM, $0, where 4 of 5 fixtures land), tier 2 typography (0 LLM, $0), and tier 3 LLM inference only for the rare 2-of-122 sections."></p>
 
 The three tiers:
 
@@ -34,7 +34,7 @@ Every section is then **verified locally** against its own start page. A mismatc
 
 Retrieval is a **fixed two-call pipeline** — BM25 over the structure → optional LLM selection → a budgeted, citable answer context — never an agent loop that re-sends the whole tree on every turn.
 
-<p align="center"><img src="assets/pipeline.png" width="560" alt="Marque's fixed two-call pipeline (BM25 over sections → select from titles → answer from a budgeted context) beside an agentic tree-RAG loop that re-sends the tree and every fetched page each turn — costing 4.4 to 8.3× the tokens."></p>
+<p align="center"><img src="assets/pipeline.png" width="820" alt="Marque's fixed two-call pipeline (BM25 over sections → select from titles → answer from a budgeted context) beside an agentic tree-RAG loop that re-sends the tree and every fetched page each turn — costing 4.4 to 8.3× the tokens."></p>
 
 ## 🎯 Why Marque
 
