@@ -12,6 +12,7 @@ import { extractMarkdown } from './markdown.mjs';
 import { extractHtml } from './html.mjs';
 import { extractDocx } from './docx.mjs';
 import { extractEpub } from './epub.mjs';
+import { extractText } from './plaintext.mjs';
 
 const extractorFor = {
   md: extractMarkdown,
@@ -20,6 +21,8 @@ const extractorFor = {
   htm: extractHtml,
   docx: extractDocx,
   epub: extractEpub,
+  txt: extractText,
+  text: extractText,
 };
 
 export async function extract(path, opts) {

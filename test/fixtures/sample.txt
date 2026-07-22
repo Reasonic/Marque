@@ -1,0 +1,24 @@
+Vectorless RAG
+==============
+
+Structure-first document indexing without a vector database. This lead paragraph
+is not a heading, and this sentence keeps it well over the length limit anyway.
+
+1. Background
+
+Embeddings and vector stores add cost and infrastructure to retrieval. Note that
+1. this numbered list item is a full sentence and must not become a heading.
+
+1.1 Prior Work
+
+PageIndex reconstructs a document structure with hundreds of LLM calls, reading
+none of the structure the file already contains.
+
+METHODOLOGY
+
+We read the embedded outline first, then typography, then an LLM only for what is
+genuinely ambiguous. NASA and IBM are acronyms in this body line, not a heading.
+
+Chapter 4: Conclusion
+
+Documents already carry their structure; reading it is exact, instant, and free.

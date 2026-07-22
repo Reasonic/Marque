@@ -25,6 +25,7 @@ const DEFAULTS = [
   'test/fixtures/sample.html',
   'test/fixtures/sample.docx',
   'test/fixtures/sample.epub',
+  'test/fixtures/sample.txt',
 ].map((p) => new URL(`../${p}`, import.meta.url).pathname);
 
 const files = process.argv.slice(2).length ? process.argv.slice(2) : DEFAULTS;
