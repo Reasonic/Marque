@@ -1,6 +1,6 @@
 {
   "name": "marque-rag",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Marque — structure-first document indexing for RAG, without a vector database",
   "main": "src/index.mjs",
   "types": "./types/index.d.mts",
