@@ -30,14 +30,19 @@ Retrieval is a **fixed two-call pipeline** — BM25 over the structure → optio
 
 ## 🎯 Why Marque
 
-| | Vector RAG | LLM tree-building | **Marque** |
+Every other approach **reconstructs** what the document already contains — with an LLM, with embeddings, or with an OCR/layout model. Marque **reads** it. Here's the difference against each alternative, and what it saves you:
+
+| Alternative | How it gets structure | What Marque does instead | What you save |
 |---|---|---|---|
-| Where structure comes from | re-learned by embeddings | rebuilt with the LLM | **read from the file** |
-| Vector database | required | none | **none** |
-| Indexing cost | embed every chunk | ~$1–6 / document | **~$0** |
-| Chunking to tune | yes | — | **none** |
-| Tokens per query | chunk budget | re-sends the tree each turn | **4.4–8.3× fewer** |
-| Every number reproducible | — | — | **yes — shipped benchmarks** |
+| **Vector RAG**<br/><sub>LangChain / LlamaIndex default, or Anthropic Contextual Retrieval</sub> | chunk → embed → vector database | reads the document's own structure | no vector DB, no embeddings, no chunking — and a **measured statistical tie** on retrieval (FinanceBench, QASPER) |
+| **PageIndex**<br/><sub>vectorless, the same core idea</sub> | rebuilds the tree with an LLM — ~200–250 calls, ~$1–6/doc <sup>1</sup> | reads the outline the file already ships, verifies locally, **never guesses** | **~$0** indexing · **0 LLM calls** on 4/5 fixtures · **4.4–8.3× fewer** tokens per query |
+| **RAPTOR**<br/><sub>hierarchical tree RAG</sub> | clusters + LLM-summarizes chunks, *with embeddings* | uses the document's own tree, no embeddings | a **measured tie** at ~1% of the run cost — **$3** for 150 questions |
+| **GraphRAG**<br/><sub>Microsoft</sub> | LLM-builds a knowledge graph across the whole corpus | navigates a single document's structure directly | far cheaper for *"which section answers this?"* (GraphRAG targets corpus-wide sensemaking) |
+| **ML parsers**<br/><sub>Unstructured, LlamaParse, Azure Document Intelligence</sub> | OCR / layout ML over the pixels | reads the structure already in the digital file | ~$0 vs per-page ML parsing <sup>2</sup> |
+
+<sub><sup>1</sup> Estimated from PageIndex's MIT source, not a measured figure. &nbsp;·&nbsp; <sup>2</sup> ML parsers still win on **scanned / image-only** PDFs, where Marque needs OCR it doesn't do.</sub>
+
+**The through-line:** for the huge class of digital documents that already carry their structure, you don't rebuild it — you *read* it, exactly and for free, and pay for intelligence only on the genuinely ambiguous remainder.
 
 ## 📚 Six formats, one dispatcher
 
