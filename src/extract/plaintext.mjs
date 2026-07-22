@@ -14,7 +14,7 @@ import fs from 'node:fs';
  *   - a Chapter/Section/Part/Appendix keyword
  *   - an ALL-CAPS short line set off by a blank line above
  */
-const RULE = /^([=\-])\1{2,}\s*$/;                    // === (depth 0) or --- (depth 1)
+const RULE = /^([-=])\1{2,}\s*$/;                     // === (depth 0) or --- (depth 1)
 const NUMBERED = /^(\d+(?:\.\d+)*)\.?\s+([A-Z].{0,78})$/;
 const KEYWORD = /^((?:chapter|section|part|appendix)\b.{0,60})$/i;
 const ALLCAPS = /^[A-Z][A-Z0-9 &,'()./-]{2,58}$/;
