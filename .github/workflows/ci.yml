@@ -18,8 +18,8 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -34,8 +34,8 @@ jobs:
       matrix:
         node: [22, 24]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -43,7 +43,7 @@ jobs:
       # Fixtures are fetched, not committed. Cache them across runs; fork PRs
       # read the base repo's cache, so they stay green without re-fetching.
       - name: Cache benchmark fixtures
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: bench/fixtures
           key: fixtures-${{ hashFiles('bench/fetch-fixtures.sh') }}
@@ -59,8 +59,8 @@ jobs:
     name: provider (live, secret-gated)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
