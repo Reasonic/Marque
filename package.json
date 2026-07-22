@@ -17,6 +17,7 @@
     "bench:structure-cost": "node bench/structure-cost.mjs",
     "bench:structure-accuracy": "node bench/structure-accuracy.mjs",
     "bench:significance": "node bench/financebench/significance.mjs",
+    "bench:qasper": "node --env-file=.env bench/qasper/run.mjs",
     "bench:all": "node bench/all.mjs",
     "eval": "node bench/retrieval-eval.mjs",
     "fixtures": "./bench/fetch-fixtures.sh",

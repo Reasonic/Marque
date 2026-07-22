@@ -26,3 +26,6 @@ bench/financebench/results*.json
 bench/financebench/raptor/
 bench/financebench/raptor-venv/
 bench/financebench/results-raptor*.json
+
+# QASPER dataset is fetched, not committed (AllenAI)
+bench/qasper/data/
