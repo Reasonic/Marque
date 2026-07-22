@@ -14,36 +14,13 @@ Retrieval usually starts by *destroying* information. A document arrives with an
 
 Marque takes the opposite path. It **reads the structure the document already has** — the embedded PDF outline, the Word heading styles, the Markdown `#`s, the HTML tags, the EPUB spine — builds an exact tree in **milliseconds**, and answers by navigating that tree. No vector database to stand up. No embeddings to compute. No chunking to tune. An LLM is a *last resort*, used only for the rare file that genuinely hides its structure — **2 sections out of 122** across our fixtures.
 
-```mermaid
-flowchart LR
-    doc(["📄 A document that<br/>already has an outline"])
-    doc --> emb["Vector RAG —<br/>chunk + embed → vector DB"]
-    doc --> pi["PageIndex —<br/>~200 LLM calls → rebuild the tree"]
-    doc --> ocr["ML parsers —<br/>OCR / layout ML → parse the tree"]
-    doc ==>|reads it| mq["Marque —<br/>the outline it already ships · exact · $0"]
-    classDef rebuild fill:#f6ecdd,stroke:#97590a,color:#5a3607;
-    classDef read fill:#e7f4ee,stroke:#0b7a53,stroke-width:2px,color:#0b3d2a;
-    class emb,pi,ocr rebuild
-    class mq read
-```
+<p align="center"><img src="assets/reconstruct-vs-read.png" width="560" alt="Everyone else reconstructs a document's structure — Vector RAG chunks and embeds, PageIndex rebuilds it with ~200 LLM calls, ML parsers OCR the pixels — while Marque reads the outline the file already ships: exact, $0."></p>
 
 ## ⚙️ How It Works — cheapest tier wins
 
 Structure is recovered in tiers, cheapest first. A document exits at the first tier that can read it — and most never reach the LLM:
 
-```mermaid
-flowchart TD
-    D(["📄 Any document"]) --> T1{"Tier 1<br/>ships an outline<br/>or markup?"}
-    T1 -->|"yes · 4 of 5 fixtures"| F1["✓ exact tree<br/>0 LLM · $0"]
-    T1 -->|no| T2{"Tier 2<br/>headings by<br/>typography?"}
-    T2 -->|yes| F2["✓ recovered tree<br/>0 LLM · $0"]
-    T2 -->|"no · rare"| T3["Tier 3<br/>LLM inference<br/>2 of 122 sections"]
-    T3 --> F3["✓ inferred tree<br/>batched LLM"]
-    classDef free fill:#e7f4ee,stroke:#0b7a53,stroke-width:1.5px,color:#0b3d2a;
-    classDef llm fill:#edecfb,stroke:#4338ca,stroke-width:1.5px,color:#2a2470;
-    class F1,F2 free
-    class T3,F3 llm
-```
+<p align="center"><img src="assets/tier-cascade.png" width="500" alt="Tier cascade: a document exits at the first tier that can read it — tier 1 embedded outline or markup (0 LLM, $0, where 4 of 5 fixtures land), tier 2 typography (0 LLM, $0), and tier 3 LLM inference only for the rare 2-of-122 sections."></p>
 
 The three tiers:
 
@@ -57,26 +34,7 @@ Every section is then **verified locally** against its own start page. A mismatc
 
 Retrieval is a **fixed two-call pipeline** — BM25 over the structure → optional LLM selection → a budgeted, citable answer context — never an agent loop that re-sends the whole tree on every turn.
 
-```mermaid
-flowchart LR
-    subgraph m ["Marque — fixed, 2 LLM calls"]
-        direction TB
-        mq(["❓"]) --> b1["BM25 over sections<br/>0 tokens"]
-        b1 --> s1["select from titles<br/>1 small call"]
-        s1 --> a1["answer from<br/>budgeted context"]
-    end
-    subgraph l ["Agentic tree-RAG — a loop"]
-        direction TB
-        lq(["❓"]) --> g1["get tree"]
-        g1 --> g2["fetch pages<br/>+ resend tree"]
-        g2 --> g3["fetch more<br/>+ resend tree + pages"]
-        g3 --> g4["⋯ 4.4–8.3×<br/>the tokens"]
-    end
-    classDef fixed fill:#e7f4ee,stroke:#0b7a53,color:#0b3d2a;
-    classDef costly fill:#f6ecdd,stroke:#97590a,color:#5a3607;
-    class b1,s1,a1 fixed
-    class g2,g3,g4 costly
-```
+<p align="center"><img src="assets/pipeline.png" width="560" alt="Marque's fixed two-call pipeline (BM25 over sections → select from titles → answer from a budgeted context) beside an agentic tree-RAG loop that re-sends the tree and every fetched page each turn — costing 4.4 to 8.3× the tokens."></p>
 
 ## 🎯 Why Marque
 
