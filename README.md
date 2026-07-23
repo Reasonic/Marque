@@ -2,7 +2,7 @@
 
 **Structure-First RAG · No Vector DB · No Embeddings · No Chunking · 6 Formats · Reproducible Benchmarks**
 
-![license](https://img.shields.io/badge/license-MIT-blue) ![node](https://img.shields.io/badge/node-%3E%3D22-brightgreen) ![vector DB](https://img.shields.io/badge/vector%20DB-none-success) ![tests](https://img.shields.io/badge/tests-65%20passing-success)
+![license](https://img.shields.io/badge/license-MIT-blue) ![node](https://img.shields.io/badge/node-%3E%3D22-brightgreen) ![vector DB](https://img.shields.io/badge/vector%20DB-none-success) ![tests](https://img.shields.io/badge/tests-71%20passing-success)
 
 > **Documents already carry their own structure. Marque reads it — and navigates straight to the answer — instead of paying an embedding model or an LLM to reconstruct what the file already contains.**
 
@@ -42,13 +42,13 @@ Every other approach **reconstructs** what the document already contains — wit
 
 | Alternative | How it gets structure | What Marque does instead | What you save |
 |---|---|---|---|
-| **Vector RAG**<br/><sub>LangChain / LlamaIndex default, or Anthropic Contextual Retrieval</sub> | chunk → embed → vector database | reads the document's own structure | no vector DB, no embeddings, no chunking — and a **measured statistical tie** on retrieval (FinanceBench, QASPER) |
+| **Vector RAG**<br/><sub>LangChain / LlamaIndex default, or Anthropic Contextual Retrieval</sub> | chunk → embed → vector database | reads the document's own structure | no vector DB, no embeddings, no chunking — and a **measured statistical tie** on retrieval (FinanceBench, QASPER, CUAD) |
 | **PageIndex**<br/><sub>vectorless, the same core idea</sub> | rebuilds the tree with an LLM — ~200–250 calls, ~$1–6/doc <sup>1</sup> | reads the outline the file already ships, verifies locally, **never guesses** | **~$0** indexing · **0 LLM calls** on 4/5 fixtures · **4.4–8.3× fewer** tokens per query <sup>3</sup> |
 | **RAPTOR**<br/><sub>hierarchical tree RAG</sub> | clusters + LLM-summarizes chunks, *with embeddings* | uses the document's own tree, no embeddings | a **measured tie** at ~1% of the run cost — **$3** for 150 questions |
 | **GraphRAG**<br/><sub>Microsoft</sub> | LLM-builds a knowledge graph across the whole corpus | navigates a single document's structure directly | far cheaper for *"which section answers this?"* (GraphRAG targets corpus-wide sensemaking) |
 | **ML parsers**<br/><sub>Unstructured, LlamaParse, Azure Document Intelligence</sub> | OCR / layout ML over the pixels | reads the structure already in the digital file | ~$0 vs per-page ML parsing <sup>2</sup> |
 
-<sub><sup>1</sup> Estimated from PageIndex's MIT source, not a measured figure. &nbsp;·&nbsp; <sup>2</sup> ML parsers still win on **scanned / image-only** PDFs, where Marque needs OCR it doesn't do. &nbsp;·&nbsp; <sup>3</sup> On **accuracy**, PageIndex leads: on its own 98.7% FinanceBench benchmark, under its own grader and reusing its published answers, Marque reaches **50.7%** vs PageIndex's **92.7%** (single `gpt-4o` judge). Marque's advantage is **$0 / 0-LLM indexing**, not table-QA accuracy — the honest head-to-head is in [`bench/financebench`](bench/financebench/README.md#head-to-head-vs-pageindex-the-987-claim).</sub>
+<sub><sup>1</sup> Estimated from PageIndex's MIT source, not a measured figure. &nbsp;·&nbsp; <sup>2</sup> ML parsers still win on **scanned / image-only** PDFs, where Marque needs OCR it doesn't do. &nbsp;·&nbsp; <sup>3</sup> On **accuracy**, PageIndex leads: on its own 98.7% FinanceBench benchmark, under its own grader and reusing its published answers, Marque reaches **48.0%** vs PageIndex's **91.3%** (single `gpt-4o` judge). Marque's advantage is **$0 / 0-LLM indexing**, not table-QA accuracy — the honest head-to-head is in [`bench/financebench`](bench/financebench/README.md#head-to-head-vs-pageindex-the-987-claim).</sub>
 
 **The through-line:** for the huge class of digital documents that already carry their structure, you don't rebuild it — you *read* it, exactly and for free, and pay for intelligence only on the genuinely ambiguous remainder.
 
@@ -135,11 +135,12 @@ agent loop; with no LLM it is a complete, zero-token path. The honest weak spot 
 Marque is benchmarked *honestly* — against a **fully-tuned** contextual-embedding vector stack, with significance tests and gold-standard evidence, not a strawman:
 
 - **Structure extraction** — 4 of 5 fixtures resolve at **tier 1, zero LLM calls**; where a document ships no outline, tier-2 typography recovers most of it. Deterministic, $0. *(`bench:structure-accuracy`)*
-- **Retrieval** — the right section lands in the shortlist **17/17 (100%)** on the labelled eval, BM25 only, zero LLM; an optional one-call re-rank lifts top-4 selection to **16/17**. *(`npm run eval`)*
+- **Retrieval** — the right section lands in the shortlist **17/17 (100%)** on the labelled eval and top-4 selection is **16/17**, BM25 only, zero LLM (**MRR 0.871**). A section too large to pinpoint an answer within is sub-chunked into finer units, so retrieval localises the paragraph, not the chapter. *(`npm run eval`)*
 - **Query cost** — a fixed two-call pipeline uses **4.4–8.3× fewer input tokens per question** than an agentic tree-RAG that re-sends the tree and every fetched page each turn. *(`npm run bench`)*
 - **FinanceBench** *(strict end-to-end QA, third-party grader)* — structure-first is **statistically indistinguishable from the tuned vector baseline** (McNemar *p* = 0.15) and **tied with RAPTOR** (*p* = 0.77), stable across runs. *(`bench:significance`)*
-- **PageIndex head-to-head** *(their 98.7% FinanceBench claim)* — on their own benchmark and grader, reusing their published answers (not re-running them), Marque reaches **50.7%** vs PageIndex's **92.7%** (single `gpt-4o` judge; 98.7% is their 3-judge-OR headline). Marque **loses on table-figure QA** but indexes at **$0 / 0 LLM calls** vs their ~200/doc, and routing across all 84 filings in one database costs it no accuracy. Honest and reproducible. *(`bench:pageindex`)*
-- **QASPER** *(prose, scored on gold evidence paragraphs — no LLM judge)* — **ties the vector baseline at recall@5** (77.9% vs 79.6%), with **no embeddings**. *(`bench:qasper`)*
+- **PageIndex head-to-head** *(their 98.7% FinanceBench claim)* — on their own benchmark and grader, reusing their published answers (not re-running them), Marque reaches **48.0%** vs PageIndex's **91.3%** (single `gpt-4o` judge; 98.7% is their 3-judge-OR headline). Marque **loses on table-figure QA** but indexes at **$0 / 0 LLM calls** vs their ~200/doc, and routing across all 84 filings in one database costs it no accuracy. Honest and reproducible. *(`bench:pageindex`)*
+- **QASPER** *(prose, scored on gold evidence paragraphs — no LLM judge)* — **ties the vector baseline at recall@5** (77.6% vs 79.6%), with **no embeddings**. *(`bench:qasper`)*
+- **CUAD** *(510 contracts, scored on gold clause spans — no LLM judge)* — structure-first, with sub-section chunking, **ties fixed-chunk retrieval** at **73.5% vs 73.0%** over 5,080 clause questions, **$0**. Contracts are the mirror of FinanceBench: where the answer is a clause, structure-first matches the strongest free baseline. *(`bench:cuad`)*
 
 Every figure regenerates from a script in [`bench/`](bench/), with methodology and caveats in each `bench/*/README.md`. We don't publish a number we can't reproduce.
 

@@ -29,3 +29,7 @@ bench/financebench/results-raptor*.json
 
 # QASPER dataset is fetched, not committed (AllenAI)
 bench/qasper/data/
+
+# CUAD dataset is fetched, not committed (Atticus Project, CC BY 4.0)
+bench/cuad/data/
+bench/cuad/results*.json

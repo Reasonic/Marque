@@ -82,9 +82,15 @@ for (const id of ids) {
     if (!gold.size) { skipped++; continue; } // evidence was figures/tables only, or unmatched
     n++;
 
-    // Marque: BM25 over the structure it read. No LLM, no embeddings.
+    // Marque: BM25 over the structure it read. No LLM, no embeddings. A sub-unit
+    // id ("0004~2") belongs to its parent section (0004); map it back and keep the
+    // section's first (highest-ranked) appearance so evidence scoring stays at
+    // section granularity.
     const res = await query(indexed, qa.question, { prefilter: 25 });
-    const mRank = res.candidates.map((c) => Number(c.node_id)).filter((i) => !Number.isNaN(i));
+    const seenSec = new Set();
+    const mRank = res.candidates
+      .map((c) => Number(String(c.node_id).split('~')[0]))
+      .filter((i) => !Number.isNaN(i) && !seenSec.has(i) && seenSec.add(i));
 
     // Vector: cosine over the same section units.
     const vRank = secEmb.embeddings.map((e, i) => [i, cosine(qEmb.embeddings[qi], e)])

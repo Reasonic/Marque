@@ -309,42 +309,42 @@ the only honest comparison holds those fixed and varies **retrieval**.
 
 | system | PageIndex's own judge | our strict judge | vector DB? | index cost |
 |---|---|---|---|---|
-| PageIndex (reused `result_gpt4o.json`) | **92.7%** | **71.3%** | no | ~200 LLM calls/doc |
-| **Marque** (structure-first) | **50.7%** | **38.7%** | **no** | **0 LLM calls · $0** |
+| PageIndex (reused `result_gpt4o.json`) | **91.3%** | **72.0%** | no | ~200 LLM calls/doc |
+| **Marque** (structure-first) | **48.0%** | **39.3%** | **no** | **0 LLM calls · $0** |
 | *PageIndex published headline* | *98.7%* | *—* | | |
 
 The published 98.7% is their **3-judge OR + human** protocol; graded with a single `gpt-4o`
-judge — the same judge we apply to Marque — their own file scores **92.7%**. We report both,
+judge — the same judge we apply to Marque — their own file scores **91.3%**. We report both,
 and the 98.7% at face value.
 
 By question type, under PageIndex's judge:
 
 | type | n | Marque | PageIndex |
 |---|---|---|---|
-| metrics-generated | 50 | 52% | 98% |
-| domain-relevant   | 50 | 54% | 96% |
-| novel-generated   | 50 | 46% | 84% |
+| metrics-generated | 50 | 48% | 98% |
+| domain-relevant   | 50 | 46% | 94% |
+| novel-generated   | 50 | 50% | 82% |
 
 **Marque loses, clearly, and the diagnosis is precise.** Two findings, both honest:
 
 - **Structure-first is not a substitute for a tuned financial-QA pipeline on tables.**
   Marque routes to the correct filing 98.7% of the time and picks a section from it as the top
-  hit 76.7% of the time — but even when the right filing is chosen, it answers only **58%** of
-  the questions, and **42 of 150** of its answers are "that figure is not in the retrieved
+  hit 82.7% of the time — but even when the right filing is chosen, it answers only **49%** of
+  the questions, and **43 of 150** of its answers are "that figure is not in the retrieved
   sections". The answers are numbers inside financial-statement tables, and a ratio needs two
   of them (the balance sheet *and* the cash-flow statement); lexical retrieval plus text
-  extraction from mangled table text is where this breaks. This is the same boundary the
-  contextual-baseline comparison above draws — restated against PageIndex's flagship number, on
-  their own grader.
-- **The cross-document setting is nearly free.** Marque's **38.7% strict** here is essentially
+  extraction from mangled table text is where this breaks — sub-section chunking (which helps
+  clause retrieval on contracts) does not rescue a number that never extracted cleanly from a
+  table. This is the same boundary the contextual-baseline comparison above draws — restated
+  against PageIndex's flagship number, on their own grader.
+- **The cross-document setting is nearly free.** Marque's **39.3% strict** here is essentially
   its **~36% single-document** strict score elsewhere in this benchmark — so routing across 84
-  filings, with no vector store, cost no accuracy (it is if anything marginally higher, within
-  run-to-run noise). The company/year router holds up.
+  filings, with no vector store, cost no accuracy. The company/year router holds up.
 
 ## Cost and reproducibility
 
 The whole 150-question Marque run — indexing all 84 filings, routing, answering, **and**
-grading both systems with both judges — metered **$5.65**. Marque's *indexing* is **0 LLM
+grading both systems with both judges — metered **$3.61**. Marque's *indexing* is **0 LLM
 calls, $0**; the spend is gpt-4o answering and grading. PageIndex's side cost us nothing to
 include, because we reused their published answers rather than rebuilding ~200 trees per
 document.

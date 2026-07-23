@@ -1,6 +1,6 @@
 {
   "name": "marque-rag",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Marque — structure-first document indexing for RAG, without a vector database",
   "main": "src/index.mjs",
   "types": "./types/index.d.mts",
@@ -19,6 +19,7 @@
     "bench:significance": "node bench/financebench/significance.mjs",
     "bench:pageindex": "node --env-file=.env bench/financebench/pageindex-compare.mjs",
     "bench:qasper": "node --env-file=.env bench/qasper/run.mjs",
+    "bench:cuad": "node bench/cuad/run.mjs",
     "bench:non-pdf": "node bench/non-pdf.mjs",
     "bench:all": "node bench/all.mjs",
     "eval": "node bench/retrieval-eval.mjs",

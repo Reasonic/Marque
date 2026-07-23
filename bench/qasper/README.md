@@ -41,17 +41,17 @@ only are excluded). 95% Wilson CIs.
 
 | metric | Marque (BM25, no embeddings) | vector baseline |
 |---|---|---|
-| recall@1  | 28.1%  [25.3%, 31.2%] | **36.9%**  [33.8%, 40.1%] |
-| recall@3  | 58.8%  [55.6%, 62.0%] | **65.9%**  [62.7%, 68.9%] |
-| recall@5  | **77.9%**  [75.0%, 80.5%] | 79.6%  [76.9%, 82.1%] |
-| recall@10 | 92.8%  [90.9%, 94.3%] | 95.3%  [93.7%, 96.5%] |
-| MRR       | 48.3% | 55.2% |
+| recall@1  | 27.5%  [24.7%, 30.5%] | **36.9%**  [33.8%, 40.1%] |
+| recall@3  | 60.5%  [57.3%, 63.7%] | **66.0%**  [62.8%, 69.0%] |
+| recall@5  | **77.6%**  [74.8%, 80.2%] | 79.6%  [76.9%, 82.1%] |
+| recall@10 | 92.2%  [90.3%, 93.8%] | 95.3%  [93.7%, 96.5%] |
+| MRR       | 48.1% | 55.2% |
 
 **Read honestly:**
 - **Vectors have a real edge at top-1** (recall@1, no CI overlap): semantic matching
   finds the single best section better than lexical matching. This is the genuine
   cost of going vectorless on prose QA, stated plainly.
-- **By recall@5 the two are a statistical tie** (77.9% vs 79.6%, CIs overlap), and by
+- **By recall@5 the two are a statistical tie** (77.6% vs 79.6%, CIs overlap), and by
   recall@10 they are near-parity (both > 92%). When retrieval hands an LLM a handful
   of sections — the normal case — structure-first surfaces the evidence about as
   reliably as embeddings, **with no vector database and at $0**.

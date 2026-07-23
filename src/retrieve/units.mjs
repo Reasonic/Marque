@@ -17,13 +17,53 @@
  */
 import { countTokens } from './payload.mjs';
 
+// A section larger than this is too coarse to *localize* a short answer inside —
+// the section ranks, but the needle is one paragraph of many. We add finer
+// sub-units over its span so retrieval can land on the paragraph, not the chapter.
+const MAX_UNIT_TOKENS = 400;
+const SUB_TOKENS = 220;
+const SUB_OVERLAP = 60;
+
+/**
+ * Overlapping sub-window units over an oversized unit's span. The parent stays
+ * (it carries the section title and gives coarse recall); a sub-unit that a query
+ * selects supersedes it via query()'s ancestor-dropping. This is structure-first
+ * with chunking *inside* a section too big to pinpoint — measured to lift clause
+ * retrieval on contracts (CUAD) without a vector store, and it never changes a
+ * unit's span, only adds finer ones.
+ */
+function subUnits(text, unit) {
+  const total = countTokens(text.slice(unit.char_start, unit.char_end));
+  if (total <= MAX_UNIT_TOKENS) return [];
+  const span = unit.char_end - unit.char_start;
+  const cpt = span / total; // chars per token, for this text
+  const win = Math.round(SUB_TOKENS * cpt);
+  const step = Math.max(1, Math.round((SUB_TOKENS - SUB_OVERLAP) * cpt));
+  const out = [];
+  for (let i = 0, k = 0; i < span; i += step, k += 1) {
+    out.push({
+      ...unit,
+      node_id: `${unit.node_id}~${k}`,
+      char_start: unit.char_start + i,
+      char_end: Math.min(unit.char_end, unit.char_start + i + win),
+    });
+    if (unit.char_start + i + win >= unit.char_end) break;
+  }
+  return out;
+}
+
 /**
  * Sections as retrieval units, plus a unit for any text the structure leaves
- * uncovered. No windowing — a section stays whole, so recall behaves exactly as
- * before on documents whose outline is complete.
+ * uncovered, plus finer sub-units inside any section too large to localize a
+ * short answer within (see subUnits). A well-sized section is untouched, so recall
+ * on well-structured documents is unchanged; only oversized/collapsed spans gain
+ * finer targets.
+ * @param {object} [opts]
+ * @param {boolean} [opts.subChunk=true] emit sub-units for oversized sections
  * @returns {Array<{node_id, title, char_start, char_end, start_index, end_index}>}
  */
-export function retrievalUnits(doc, flat) {
+export function retrievalUnits(doc, flat, opts = {}) {
+  const { subChunk = true } = opts;
   const text = doc.fullText;
   const units = flat.map(({ node }) => ({
     node_id: node.node_id,
@@ -57,7 +97,8 @@ export function retrievalUnits(doc, flat) {
     });
   });
 
-  return units;
+  if (!subChunk) return units;
+  return units.flatMap((u) => [u, ...subUnits(text, u)]);
 }
 
 /**
